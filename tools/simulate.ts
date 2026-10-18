@@ -22,6 +22,8 @@ for (const f of FEATURES) {
     `  ${f.padEnd(14)} ${pct(r.features[f])}${budget(f)}  1 in ${every}, avg ${r.averageAward[f].toFixed(1)}× bet`,
   );
 }
+console.log(`  Drive-By       1 in ${Math.round(r.driveByEvery)}`);
+console.log(`  Wanted payday  1 in ${Math.round(r.guaranteedEvery)}`);
 console.log(`  Hit rate       ${pct(r.hitRate)}`);
 console.log(`  Biggest win    ${r.maxWinMultiplier.toFixed(1)}× bet`);
 console.log(`  (${((Date.now() - started) / 1000).toFixed(1)} s)`);

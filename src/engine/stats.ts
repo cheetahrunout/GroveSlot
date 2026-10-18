@@ -13,6 +13,8 @@ export interface RtpBreakdown {
   triggerEvery: Record<FeatureKey, number>;
   /** Average feature payout in total bets, keyed by feature. */
   averageAward: Record<FeatureKey, number>;
+  driveByEvery: number;
+  guaranteedEvery: number;
 }
 
 const perFeature = (value: number) =>
@@ -27,6 +29,8 @@ export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdow
   let base = 0;
   let hits = 0;
   let maxWin = 0;
+  let driveBys = 0;
+  let guaranteed = 0;
   const featureWin = perFeature(0);
   const featureCount = perFeature(0);
 
@@ -39,6 +43,8 @@ export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdow
     base += r.base.totalWin;
     if (r.totalWin > 0) hits++;
     maxWin = Math.max(maxWin, r.totalWin / r.totalBet);
+    if (r.driveBy) driveBys++;
+    if (r.guaranteed) guaranteed++;
     for (const f of FEATURES) {
       const feature = r.features[f];
       if (feature) {
@@ -62,5 +68,7 @@ export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdow
     averageAward: Object.fromEntries(
       FEATURES.map((f) => [f, featureCount[f] > 0 ? featureWin[f] / featureCount[f] / totalBet : 0]),
     ) as Record<FeatureKey, number>,
+    driveByEvery: driveBys > 0 ? rounds / driveBys : Infinity,
+    guaranteedEvery: guaranteed > 0 ? rounds / guaranteed : Infinity,
   };
 }

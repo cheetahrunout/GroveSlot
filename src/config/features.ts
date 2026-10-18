@@ -48,7 +48,7 @@ export const CASH_RUN = {
   /** Respins given at the start and after every new Cash Bag. */
   respins: 3,
   /** Chance that an empty cell lands a Cash Bag on a respin. */
-  landChance: 0.03,
+  landChance: 0.027,
   /**
    * What a Cash Bag holds: a multiple of the total bet or a jackpot.
    * The Kingpin is only won by filling all 15 cells.
@@ -66,13 +66,59 @@ export const CASH_RUN = {
   ] as readonly ({ multiplier: number; weight: number } | { jackpot: Exclude<JackpotId, 'kingpin'>; weight: number })[],
 } as const;
 
+export type WheelSlice =
+  | { type: 'prize'; multiplier: number }
+  | { type: 'backup' }
+  | { type: 'ballas' };
+
+export const TURF_WAR = {
+  /** Neighbourhoods to take, in order. */
+  territories: ['GANTON', 'IDLEWOOD', 'JEFFERSON', 'GLEN PARK', 'WILLOWFIELD', 'EAST LS', 'EL CORONA', 'LITTLE MEXICO'],
+  /** Chance of a surprise Turf War after a spin that won nothing and triggered nothing. */
+  randomChance: 1 / 500,
+  /** Taking every territory pays this × bet on top. */
+  turfBossMultiplier: 100,
+  /** Equal-sized wheel slices, clockwise from the top. */
+  wheel: [
+    { type: 'prize', multiplier: 2 },
+    { type: 'ballas' },
+    { type: 'prize', multiplier: 5 },
+    { type: 'prize', multiplier: 3 },
+    { type: 'backup' },
+    { type: 'prize', multiplier: 2 },
+    { type: 'ballas' },
+    { type: 'prize', multiplier: 3 },
+    { type: 'prize', multiplier: 2 },
+    { type: 'ballas' },
+    { type: 'prize', multiplier: 5 },
+    { type: 'ballas' },
+  ] as readonly WheelSlice[],
+} as const;
+
+export const DRIVE_BY = {
+  /** Chance per base-game spin. */
+  chance: 1 / 200,
+  minWilds: 1,
+  maxWilds: 3,
+} as const;
+
+export const WANTED = {
+  maxStars: 5,
+  /** Losing spins in a row that cost a star. */
+  lossesPerStar: 2,
+  /** At max stars the next spin wins at least this × bet. */
+  guaranteedMultiplier: 5,
+} as const;
+
 /**
  * Share of the 96% RTP each part of the game is tuned to. The simulator
  * test checks the measured values against these.
  */
 export const RTP_BUDGET = {
+  /** Includes Drive-By wilds and Wanted Level guaranteed wins. */
   base: 0.58,
   freeSpins: 0.2,
   lowriderHop: 0.07,
   holdAndSpin: 0.07,
+  turfWar: 0.04,
 } as const;

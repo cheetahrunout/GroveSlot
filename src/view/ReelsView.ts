@@ -5,9 +5,10 @@ import type { SymbolId } from '../config/symbols';
 import type { Evaluation, Position } from '../engine/evaluate';
 import type { Grid } from '../engine/spin';
 import type { GameTextures } from './assets';
+import { createLowrider } from './art/lowrider';
 import { createSymbolView } from './SymbolView';
 import { COLORS, LINE_COLORS, textStyle } from './theme';
-import { easeOutBack, easeOutCubic, tween, wait } from './tween';
+import { easeOutBack, easeOutCubic, linear, tween, wait } from './tween';
 
 export const CELL = 220;
 export const GAP = 12;
@@ -83,16 +84,33 @@ export class ReelsView extends Container {
 
   /** Turns a whole reel wild, cell by cell, with a pop. */
   async expandReel(reel: number): Promise<void> {
-    for (let row = 0; row < ROW_COUNT; row++) {
-      const view = this.setCell(reel, row, 'WILD');
-      const { x, y } = view.position;
-      view.pivot.set(CELL / 2, CELL / 2);
-      view.position.set(x + CELL / 2, y + CELL / 2);
-      view.scale.set(0.2);
-      await tween(view, { 'scale.x': 1, 'scale.y': 1 }, 220, easeOutBack);
-      view.pivot.set(0, 0);
-      view.position.set(x, y);
+    for (let row = 0; row < ROW_COUNT; row++) await this.expandCell(reel, row);
+  }
+
+  /** A car rolls across the reels and sprays wilds onto `positions`. */
+  async driveBy(positions: readonly Position[]): Promise<void> {
+    const { car } = createLowrider(0x2b2b2b);
+    car.scale.set(0.75);
+    car.position.set(-500, GRID_HEIGHT / 2 + 80);
+    this.overlay.addChild(car);
+    for (let reel = 0; reel < REEL_COUNT; reel++) {
+      await tween(car, { x: reel * STEP + CELL / 2 }, reel === 0 ? 500 : 260, linear);
+      for (const p of positions.filter((q) => q.reel === reel)) void this.expandCell(p.reel, p.row);
     }
+    await tween(car, { x: GRID_WIDTH + 500 }, 500, linear);
+    car.destroy({ children: true });
+    await wait(250);
+  }
+
+  private async expandCell(reel: number, row: number): Promise<void> {
+    const view = this.setCell(reel, row, 'WILD');
+    const { x, y } = view.position;
+    view.pivot.set(CELL / 2, CELL / 2);
+    view.position.set(x + CELL / 2, y + CELL / 2);
+    view.scale.set(0.2);
+    await tween(view, { 'scale.x': 1, 'scale.y': 1 }, 260, easeOutBack);
+    view.pivot.set(0, 0);
+    view.position.set(x, y);
   }
 
   cellPosition(reel: number, row: number): { x: number; y: number } {

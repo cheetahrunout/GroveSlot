@@ -91,7 +91,7 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 - **No skill involved.** The engine draws every hop height from a weighted table the moment the bonus triggers. Pressing "HOP" only plays the next animation, so the result is the same however or whenever you press.
 
 ### 4.3 Turf War (wheel / map bonus)
-- Triggered by 3 **Palm G** symbols on reels 2–4, or by a random **"Turf War!"** event after any non-winning spin (≈1 in 150).
+- Triggered by 3 **Palm G** symbols on reels 2–4, or by a random **"Turf War!"** event after a spin that won and triggered nothing (1 in 500 of those).
 - A Los Santos map with territories (homage names: Idlewood, Ganton, Jefferson, East LS, Glen Park…).
 - You spin a wheel to "take" territories. Each one pays a token prize, and some unlock extra spins of the wheel. A "Ballas" slice (purple) ends the round.
 - Taking all territories pays a **Turf Boss** prize of 100× bet.
@@ -110,8 +110,8 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 | Kingpin (Grand) | 1,000× bet + 0.5% of every bet since the last hit (local "progressive") |
 
 ### 4.6 Random base-game features
-- **Drive-By:** a car rolls past and splashes 2–5 random wilds on the reels (≈1 in 80 spins).
-- **Wanted Level:** five stars in the header. Each base-game win adds a star and each loss removes one. At 5 stars the next spin is guaranteed a win of ≥ 5× bet, then the meter resets. This is a mild "streak" feeling; its cost is built into the RTP.
+- **Drive-By:** a car rolls past and sprays 1–3 wilds onto plain symbols (1 in 200 spins).
+- **Wanted Level:** five stars next to the spin button. Each winning round adds a star; every 2 losing spins in a row take one away. At 5 stars the next spin is guaranteed a line win of ≥ 5× bet (never a bonus), then the meter resets (≈ 1 in 190 spins). Its cost is built into the base-game RTP.
 
 ### 4.7 Gamble: "Car Chase" (optional after any win)
 - Double or nothing: guess which alley the car escapes through (left/right). Up to 5 rounds, capped at 10× the original win.
@@ -236,7 +236,7 @@ Prep before use:
 | 5 | **Free Spins** ✅ | Spray Can trigger (10/15/20 spins), night backdrop, expanding wilds, Tag the Hood wall raising the multiplier to ×5 with +2 spins per level, +10 retriggers, free-spin RTP ≈ 21% |
 | 6 | **Lowrider Hop** ✅ | Pick 1 of 3 lowriders (cosmetic), 5 hops drawn from a weighted ×2–×50 table when the bonus triggers; HOP only plays the next animation; ≈ 7% RTP |
 | 7 | **Hold & Spin + Jackpots** ✅ | Stacked Cash Bags with values, 6+ start Cash Run: 3 respins that reset on every new bag, collect screen, Homie/Soldier/OG bag jackpots, Kingpin (1,000× + pot) for all 15 cells, jackpot meter, saved pot; ≈ 7.7% RTP |
-| 8 | **Turf War + Drive-By + Wanted Level** | Random features and wheel/map scene |
+| 8 | **Turf War + Drive-By + Wanted Level** ✅ | Turf War wheel (prizes, Backup, Ballas) and Los Santos map with Turf Boss; Drive-By car spraying 1–3 wilds; Wanted stars with a guaranteed 5× payday; total RTP ≈ 97% before final tuning |
 | 9 | **Gamble** | Car Chase double-or-nothing |
 | 10 | **Economy polish** | Daily handout, rescue, stats, achievements, cosmetic unlocks |
 | 11 | **Art and audio pass** | Replace placeholders, big-win celebrations, music |

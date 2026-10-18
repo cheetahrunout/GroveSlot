@@ -3,6 +3,7 @@ import type { GameTextures } from './assets';
 import { Banner } from './Banner';
 import { FreeSpinsBar } from './FreeSpinsBar';
 import { JackpotBar } from './JackpotBar';
+import { WantedMeter } from './WantedMeter';
 import { HUD, type HudHandlers } from './HUD';
 import type { Layout } from './layout';
 import { ReelsView } from './ReelsView';
@@ -15,6 +16,7 @@ export class GameScene extends Container {
   readonly banner = new Banner();
   readonly freeSpinsBar = new FreeSpinsBar();
   readonly jackpots: JackpotBar;
+  readonly wanted = new WantedMeter();
   private mode: 'base' | 'freeSpins' = 'base';
   /** Full-screen layer for bonus games, above the reels and HUD. */
   readonly overlay = new Container();
@@ -39,13 +41,14 @@ export class GameScene extends Container {
     });
     this.disclaimer.anchor.set(0.5, 1);
     this.freeSpinsBar.visible = false;
-    this.addChild(this.backdrop, this.title, this.jackpots, this.freeSpinsBar, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner);
+    this.addChild(this.backdrop, this.title, this.jackpots, this.wanted, this.freeSpinsBar, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner);
   }
 
   setMode(mode: 'base' | 'freeSpins'): void {
     this.mode = mode;
     this.freeSpinsBar.visible = mode === 'freeSpins';
     this.jackpots.visible = mode === 'base';
+    this.wanted.visible = mode === 'base';
     this.title.visible = mode === 'base' || this.layout.mode === 'portrait';
     this.drawBackdrop();
   }
@@ -76,6 +79,8 @@ export class GameScene extends Container {
       this.freeSpinsBar.scale.set(1);
       this.freeSpinsBar.position.set((W - FreeSpinsBar.barWidth) / 2, 4);
       hud.spin.position.set(left + ReelsView.outerWidth + spinColumn / 2 - 24, 150 + ReelsView.outerHeight / 2 - 24);
+      this.wanted.scale.set(1);
+      this.wanted.position.set(hud.spin.x, 260);
 
       const y = 150 + ReelsView.outerHeight + 10;
       const gap = 24;
@@ -91,10 +96,12 @@ export class GameScene extends Container {
     } else {
       const scale = (W - 80) / ReelsView.outerWidth;
       this.reels.scale.set(scale);
-      this.reels.position.set(40 + 24 * scale, 300);
+      this.reels.position.set(40 + 24 * scale, 360);
+      this.wanted.scale.set(0.9);
+      this.wanted.position.set(W / 2, 315);
       this.freeSpinsBar.scale.set((W - 40) / FreeSpinsBar.barWidth);
       this.freeSpinsBar.position.set(20, 160);
-      const below = 300 + ReelsView.outerHeight * scale + 40;
+      const below = 360 + ReelsView.outerHeight * scale + 40;
       const colW = 380;
       const gap = 40;
       const leftX = (W - colW * 2 - gap) / 2;

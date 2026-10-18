@@ -25,6 +25,16 @@ describe('game maths (200k simulated rounds)', () => {
     expect(r.features.holdAndSpin).toBeLessThan(0.11);
   });
 
+  it('keeps Turf War near its RTP budget', () => {
+    expect(r.features.turfWar).toBeGreaterThan(0.02);
+    expect(r.features.turfWar).toBeLessThan(0.07);
+  });
+
+  it('keeps the total RTP close to 96%', () => {
+    expect(r.rtp).toBeGreaterThan(0.9);
+    expect(r.rtp).toBeLessThan(1.02);
+  });
+
   it('keeps the hit rate in range', () => {
     expect(r.hitRate).toBeGreaterThan(0.18);
     expect(r.hitRate).toBeLessThan(0.32);
