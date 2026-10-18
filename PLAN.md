@@ -64,6 +64,17 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 - Rough RTP split: base game 60%, free spins 20%, Lowrider Hop 8%, Hold & Spin + jackpots 8%.
 - Max win cap: 5,000× total bet.
 
+**Base game as built (milestone 2, measured over 3M spins):**
+| Measure | Value |
+|---|---|
+| Base RTP (lines + scatter pays) | ≈ 59% (scatter ≈ 3%) |
+| Hit rate | ≈ 23% |
+| Free Spins trigger | ≈ 1 in 195 spins |
+| Lowrider Hop trigger | ≈ 1 in 570 spins |
+| Turf War trigger (symbols only) | ≈ 1 in 545 spins |
+- Line pays are in line bets (for example 3× J = 10, 5× OG = 2,000, 5× Wild = 4,000); Spray Cans pay 5× / 25× / 100× the total bet. The tables live in `src/config/paytable.ts` and the strip counts in `src/config/reels.ts`.
+- Until the bonuses are built, the game pays back only the base ≈ 59%, so balances drain faster than they will in the finished game.
+
 ---
 
 ## 4. Bonus games and features
@@ -219,7 +230,7 @@ Prep before use:
 | # | Milestone | Deliverable |
 |---|---|---|
 | 1 | **Scaffold** ✅ | Vite + TS + Pixi + Vitest, CI running tests, seeded RNG, layout system, leaderboard interface, placeholder grid |
-| 2 | **Engine core** | RNG, reel strips, spin, line evaluation, paytable; unit tests |
+| 2 | **Engine core** ✅ | Reel strips, spin, line evaluation, paytable, bonus triggers; unit tests; wired into the placeholder screen |
 | 3 | **Simulator** | `npm run sim`: 10M spins, reports RTP/hit rate; tune strips to about 96% |
 | 4 | **Base game UI** | Spinning reels with placeholder art, HUD, bet controls, win lines, wallet + localStorage |
 | 5 | **Free Spins** | Scatter trigger, expanding wilds, Tag the Hood multiplier, retriggers |
