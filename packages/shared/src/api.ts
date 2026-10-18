@@ -79,6 +79,12 @@ export interface Welcome {
   slug: string;
   dev: boolean;
   state: PublicState;
+  /**
+   * This tab's seat at the game. Send it as `X-Lowrider-Seat` on every call and as `?seat=` on the event stream:
+   * a player may hold several seats at once (several tabs), and tabs share cookies, so a cookie alone would let a
+   * second tab kick the first. Null when the request carried no seat.
+   */
+  seat: string | null;
 }
 
 /** SSE `control` event. */

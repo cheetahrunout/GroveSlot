@@ -38,6 +38,21 @@ export interface AppOptions {
 const COOKIE = 'lowrider_id';
 const COOKIE_MAX_AGE = 12 * 60 * 60;
 
+/**
+ * The seat a request speaks for: the tab's `X-Lowrider-Seat` header, `?seat=` on the event stream and the
+ * leave beacon (neither can carry a header), else the cookie for a page without storage. A player may hold
+ * several seats at once (one per tab); tabs share cookies, so the cookie can never be the only key.
+ */
+function seatOf(req: FastifyRequest): string | undefined {
+  const header = req.headers['x-lowrider-seat'];
+  const fromHeader = Array.isArray(header) ? header[0] : header;
+  if (typeof fromHeader === 'string' && fromHeader) return fromHeader;
+  const query = req.query as Record<string, unknown> | undefined;
+  const fromQuery = query?.seat;
+  if (typeof fromQuery === 'string' && fromQuery) return fromQuery;
+  return req.cookies?.[COOKIE];
+}
+
 /** The Lowrider HTTP surface: the page, /health and the page's JSON API. */
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const { game, casino, devMode } = opts;
@@ -53,8 +68,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   await app.register(fastifyRateLimit, {
     max: 300,
     timeWindow: '1 minute',
-    // Per browser where we know it, else per address.
-    keyGenerator: (req) => req.cookies?.[COOKIE] ?? req.ip,
+    // Per seat where we know it, else per address.
+    keyGenerator: (req) => seatOf(req) ?? req.ip,
   });
 
   // --- helpers ------------------------------------------------------------
@@ -65,7 +80,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     return result.data;
   };
 
-  const sessionOf = (req: FastifyRequest): PlayerSession | null => game.getSession(req.cookies[COOKIE]);
+  const sessionOf = (req: FastifyRequest): PlayerSession | null => game.getSession(seatOf(req));
 
   const requireSession = (req: FastifyRequest): PlayerSession => {
     const s = sessionOf(req);
@@ -76,7 +91,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const casinoUrl = opts.casinoUrl.replace(/\/+$/, '');
   // No session (or the casino ended it): the casino logs the player in and comes back with a fresh token.
   const playUrl = casinoUrl ? `${casinoUrl}/play/${opts.slug}` : '';
-  const welcome = (s: PlayerSession | null): Welcome => ({ casinoUrl, playUrl, slug: opts.slug, dev: devMode, state: game.publicState(s) });
+  const welcome = (s: PlayerSession | null): Welcome => ({ casinoUrl, playUrl, slug: opts.slug, dev: devMode, state: game.publicState(s), seat: s ? s.id : null });
 
   const setSessionCookie = (reply: FastifyReply, id: string) =>
     reply.setCookie(COOKIE, id, { path: '/', httpOnly: true, sameSite: 'lax', secure: opts.secureCookies, maxAge: COOKIE_MAX_AGE });
@@ -162,7 +177,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   app.post('/api/collect', async (req) => ({ state: game.collect(requireSession(req)) }));
 
   app.post('/api/leave', async (req, reply) => {
-    const id = req.cookies[COOKIE];
+    const id = seatOf(req);
     if (id) await game.closeSession(id);
     reply.clearCookie(COOKIE, { path: '/' });
     return { ok: true };
@@ -170,7 +185,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
 
   /** Server-sent events: the casino's control state, and this player's balance, as they change. */
   app.get('/api/events', (req, reply) => {
-    const sessionId = req.cookies[COOKIE];
+    const sessionId = seatOf(req);
     reply.hijack();
     const res = reply.raw;
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
