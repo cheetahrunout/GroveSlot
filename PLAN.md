@@ -232,7 +232,7 @@ Prep before use:
 | 1 | **Scaffold** ✅ | Vite + TS + Pixi + Vitest, CI running tests, seeded RNG, layout system, leaderboard interface, placeholder grid |
 | 2 | **Engine core** ✅ | Reel strips, spin, line evaluation, paytable, bonus triggers; unit tests; wired into the placeholder screen |
 | 3 | **Simulator** ✅ | `npm run sim -- [rounds] [seed]` reports RTP, hit rate, biggest win and trigger rates; a 200k-round test guards the maths in CI |
-| 4 | **Base game UI** | Spinning reels with placeholder art, HUD, bet controls, win lines, wallet + localStorage |
+| 4 | **Base game UI** ✅ | Spinning reels with bounce, HUD (balance, bet −/+, win, auto-spin 10–100, turbo, space bar), win lines cycling with labels, saved wallet |
 | 5 | **Free Spins** | Scatter trigger, expanding wilds, Tag the Hood multiplier, retriggers |
 | 6 | **Lowrider Hop** | Pick + timing mini-game scene |
 | 7 | **Hold & Spin + Jackpots** | Cash Bags, respins, 4 jackpot tiers |
