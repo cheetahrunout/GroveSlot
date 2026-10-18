@@ -8,6 +8,7 @@ import { COLORS } from '../view/theme';
 import { countUp, timing, wait } from '../view/tween';
 import type { PresentContext } from './presenters/context';
 import { presentFreeSpins } from './presenters/freeSpins';
+import { presentLowriderHop } from './presenters/lowriderHop';
 
 import { fmt } from './presenters/context';
 
@@ -84,10 +85,19 @@ export class GameController {
   }
 
   private async presentFeatures(result: RoundResult): Promise<void> {
-    const ctx: PresentContext = { scene: this.scene, turbo: this.turbo, addWin: (n) => this.addWin(n) };
+    const ctx: PresentContext = {
+      scene: this.scene,
+      turbo: this.turbo,
+      auto: this.autoRemaining !== null,
+      addWin: (n) => this.addWin(n),
+    };
     if (result.features.freeSpins) {
       await wait(400);
       await presentFreeSpins(ctx, result.features.freeSpins);
+    }
+    if (result.features.lowriderHop) {
+      await wait(400);
+      await presentLowriderHop(ctx, result.features.lowriderHop);
     }
   }
 

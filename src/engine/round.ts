@@ -3,6 +3,7 @@ import { MAX_WIN_MULTIPLIER } from '../config/paytable';
 import { BASE_REELS } from '../config/reels';
 import { evaluate, type Evaluation } from './evaluate';
 import { playFreeSpins, type FreeSpinsResult } from './features/freeSpins';
+import { playLowriderHop, type LowriderHopResult } from './features/lowriderHop';
 import type { Rng } from './rng';
 import { spinReels, type Grid } from './spin';
 
@@ -12,11 +13,12 @@ export interface GameState {}
 export const INITIAL_STATE: GameState = {};
 
 /** Bonus features, in the order a round plays them. */
-export const FEATURES = ['freeSpins'] as const;
+export const FEATURES = ['freeSpins', 'lowriderHop'] as const;
 export type FeatureKey = (typeof FEATURES)[number];
 
 export interface RoundFeatures {
   freeSpins?: FreeSpinsResult;
+  lowriderHop?: LowriderHopResult;
 }
 
 export interface RoundResult {
@@ -63,6 +65,7 @@ export function playRound(
 
   const features: RoundFeatures = {};
   if (base.triggers.freeSpins) features.freeSpins = playFreeSpins(rng, base.scatterCount, lineBet);
+  if (base.triggers.lowriderHop) features.lowriderHop = playLowriderHop(rng, totalBet);
 
   const uncapped = base.totalWin + Object.values(features).reduce((sum, f) => sum + f.totalWin, 0);
   const cap = totalBet * MAX_WIN_MULTIPLIER;

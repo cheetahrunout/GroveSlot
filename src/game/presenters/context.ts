@@ -4,6 +4,8 @@ import type { GameScene } from '../../view/GameScene';
 export interface PresentContext {
   scene: GameScene;
   turbo: boolean;
+  /** Auto-spin is running: bonuses play without waiting for input. */
+  auto: boolean;
   /** Adds to the round's running win shown in the WIN box. */
   addWin(amount: number): void;
 }

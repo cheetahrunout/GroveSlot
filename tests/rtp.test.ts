@@ -15,6 +15,11 @@ describe('game maths (200k simulated rounds)', () => {
     expect(r.features.freeSpins).toBeLessThan(0.27);
   });
 
+  it('keeps Lowrider Hop near its RTP budget', () => {
+    expect(r.features.lowriderHop).toBeGreaterThan(0.04);
+    expect(r.features.lowriderHop).toBeLessThan(0.1);
+  });
+
   it('keeps the hit rate in range', () => {
     expect(r.hitRate).toBeGreaterThan(0.2);
     expect(r.hitRate).toBeLessThan(0.32);

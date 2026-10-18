@@ -31,7 +31,7 @@ async function boot() {
 
   if (import.meta.env.DEV) {
     // Debug hook for testing: __groveslot.controller.forceNext = 'freeSpins'
-    (window as unknown as Record<string, unknown>).__groveslot = { controller };
+    (window as unknown as Record<string, unknown>).__groveslot = { controller, app };
   }
 
   window.addEventListener('keydown', (e) => {

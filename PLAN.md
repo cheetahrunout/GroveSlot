@@ -234,7 +234,7 @@ Prep before use:
 | 3 | **Simulator** ✅ | `npm run sim -- [rounds] [seed]` reports RTP, hit rate, biggest win and trigger rates; a 200k-round test guards the maths in CI |
 | 4 | **Base game UI** ✅ | Spinning reels with bounce, HUD (balance, bet −/+, win, auto-spin 10–100, turbo, space bar), win lines cycling with labels, saved wallet |
 | 5 | **Free Spins** ✅ | Spray Can trigger (10/15/20 spins), night backdrop, expanding wilds, Tag the Hood wall raising the multiplier to ×5 with +2 spins per level, +10 retriggers, free-spin RTP ≈ 21% |
-| 6 | **Lowrider Hop** | Pick + timing mini-game scene |
+| 6 | **Lowrider Hop** ✅ | Pick 1 of 3 lowriders (cosmetic), 5 hops drawn from a weighted ×2–×50 table when the bonus triggers; HOP only plays the next animation; ≈ 7% RTP |
 | 7 | **Hold & Spin + Jackpots** | Cash Bags, respins, 4 jackpot tiers |
 | 8 | **Turf War + Drive-By + Wanted Level** | Random features and wheel/map scene |
 | 9 | **Gamble** | Car Chase double-or-nothing |
