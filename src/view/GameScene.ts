@@ -89,6 +89,7 @@ export class GameScene extends Container {
       this.reels.position.set(left, 150);
       this.freeSpinsBar.scale.set(1);
       this.freeSpinsBar.position.set((W - FreeSpinsBar.barWidth) / 2, 4);
+      hud.spin.scale.set(1);
       hud.spin.position.set(left + ReelsView.outerWidth + spinColumn / 2 - 24, 150 + ReelsView.outerHeight / 2 - 24);
       this.wanted.scale.set(1);
       this.wanted.position.set(hud.spin.x, 260);
@@ -118,15 +119,17 @@ export class GameScene extends Container {
       const colW = 380;
       const gap = 40;
       const leftX = (W - colW * 2 - gap) / 2;
-      hud.balance.position.set(leftX, below);
-      hud.win.position.set(leftX + colW + gap, below);
-      hud.bet.position.set(leftX, below + 140);
-      hud.auto.position.set(leftX + colW + gap, below + 140);
-      hud.turbo.position.set(leftX + colW + gap + 170 + gap, below + 140);
-      hud.autoMenu.position.set(leftX + colW + gap, below + 130);
-      hud.spin.position.set(W / 2, below + 420);
-      hud.gamble.position.set(W / 2 + 160, below + 378);
-      hud.menu.position.set(W / 2 - 330, below + 385);
+      // Spread the controls over the tall screen, with a big thumb-sized spin.
+      hud.balance.position.set(leftX, below + 20);
+      hud.win.position.set(leftX + colW + gap, below + 20);
+      hud.bet.position.set(leftX, below + 180);
+      hud.auto.position.set(leftX + colW + gap, below + 180);
+      hud.turbo.position.set(leftX + colW + gap + 170 + gap, below + 180);
+      hud.autoMenu.position.set(leftX + colW + gap, below + 170);
+      hud.spin.scale.set(1.35);
+      hud.spin.position.set(W / 2, below + 540);
+      hud.gamble.position.set(W / 2 + 190, below + 498);
+      hud.menu.position.set(W / 2 - 370, below + 505);
     }
   }
 }

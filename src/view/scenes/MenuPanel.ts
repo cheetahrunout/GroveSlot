@@ -122,11 +122,13 @@ export class MenuPanel extends Container {
         .join(', ')} (+ pot)`,
       'The Trident G stands in for every symbol except Spray Can, Lowrider, Palm G and Cash Bag.',
     ];
-    lines.forEach((l, i) => {
-      const t = this.write(l, 0, y + i * 50, COLORS.muted, 26);
+    let lineY = y;
+    for (const l of lines) {
+      const t = this.write(l, 0, lineY, COLORS.muted, 26);
       t.style.wordWrap = true;
       t.style.wordWrapWidth = this.panelW - 80;
-    });
+      lineY += t.height + 14;
+    }
   }
 
   private renderStats(): void {

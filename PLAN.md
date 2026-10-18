@@ -65,16 +65,17 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 - Rough RTP split: base game 60%, free spins 20%, Lowrider Hop 8%, Hold & Spin + jackpots 8%.
 - Max win cap: 5,000× total bet.
 
-**Base game as built (milestone 2, measured over 3M spins):**
-| Measure | Value |
-|---|---|
-| Base RTP (lines + scatter pays) | ≈ 59% (scatter ≈ 3%) |
-| Hit rate | ≈ 23% |
-| Free Spins trigger | ≈ 1 in 195 spins |
-| Lowrider Hop trigger | ≈ 1 in 570 spins |
-| Turf War trigger (symbols only) | ≈ 1 in 545 spins |
-- Line pays are in line bets (for example 3× J = 10, 5× OG = 2,000, 5× Wild = 4,000); Spray Cans pay 5× / 25× / 100× the total bet. The tables live in `src/config/paytable.ts` and the strip counts in `src/config/reels.ts`.
-- Until the bonuses are built, the game pays back only the base ≈ 59%, so balances drain faster than they will in the finished game.
+**Final maths (10M simulated rounds, seed 2026; `npm run sim`):**
+| Part | RTP | How often |
+|---|---|---|
+| Base game (lines, scatter pays, Drive-By, Wanted paydays) | 58.6% | Drive-By 1 in 286, Wanted payday 1 in 192 |
+| Grove Street Free Spins | 19.3% | 1 in 238, avg 45.9× bet |
+| Lowrider Hop | 6.9% | 1 in 704, avg 48.7× bet |
+| Cash Run + jackpots | 7.1% | 1 in 383, avg 27.1× bet |
+| Turf War | 3.9% | 1 in 348, avg 13.5× bet |
+| **Total** | **95.8%** | hit rate 21% |
+- The hit rate ended at 21%, below the 25–30% first aimed for: Cash Bags and the other specials break lines. Raising it would mean trimming line pays further for the same RTP.
+- Line pays are in line bets (for example 3× J = 11, 5× OG = 2,250, 5× Trident G = 4,500); Spray Cans pay 5× / 25× / 100× the total bet. All numbers live in `src/config/`.
 
 ---
 
@@ -88,7 +89,7 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 
 ### 4.2 Lowrider Hop (just for fun, pure odds)
 - Triggered by 3 Lowriders on reels 1, 3 and 5.
-- Pick 1 of 3 lowriders (cosmetic), then watch it hop 5 times. Each hop pays 2×–50× bet; higher hops pay more.
+- Pick 1 of 3 lowriders (cosmetic), then watch it hop 5 times. Each hop pays 2×–60× bet; higher hops pay more.
 - **No skill involved.** The engine draws every hop height from a weighted table the moment the bonus triggers. Pressing "HOP" only plays the next animation, so the result is the same however or whenever you press.
 
 ### 4.3 Turf War (wheel / map bonus)
@@ -144,56 +145,28 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 
 ```
 src/
-  main.ts                 # bootstrap Pixi app + loader
-  config/
-    symbols.ts            # symbol ids, tiers
-    reels.ts              # reel strips (base + free spins), data-only
-    paytable.ts           # payouts per symbol/count
-    paylines.ts           # 20 line definitions
-    features.ts           # trigger rates, bonus tables, jackpots
+  main.ts                 # boots Pixi, wires controller + scene, dev-only debug hook
+  config/                 # symbols, paylines, paytable, reel strips, bonus settings, RTP budget
   engine/                 # pure TS, no rendering → fully unit-testable
-    rng.ts                # seedable PRNG (e.g. xoshiro128**), crypto seed by default
-    spin.ts               # pick stops → grid
-    evaluate.ts           # payline evaluation, scatter, bonus detection
-    features/
-      freeSpins.ts
-      lowriderHop.ts
-      turfWar.ts
-      holdAndSpin.ts
-      driveBy.ts
-      wantedLevel.ts
-      gamble.ts
-    jackpots.ts
-    stateMachine.ts       # IDLE → SPINNING → EVALUATE → FEATURE → PAYOUT → IDLE
-  economy/
-    wallet.ts             # balance, bet validation, daily handout, rescue
-    storage.ts            # versioned localStorage with try/catch + migration
-    achievements.ts
-  leaderboard/
-    leaderboard.ts        # LeaderboardService interface + LocalLeaderboard
-  view/                   # Pixi rendering, listens to engine events
-    layout.ts             # design resolutions + scale-to-fit (landscape / portrait)
-    ReelView.ts
-    WinLineView.ts
-    HUD.ts                # balance, bet, spin, auto, turbo
-    scenes/
-      BaseGameScene.ts
-      FreeSpinsScene.ts
-      LowriderHopScene.ts
-      TurfWarScene.ts
-      HoldAndSpinScene.ts
-      GambleScene.ts
-    effects/              # coin bursts, big-win banners, screen shake
-  audio/
-    sound.ts              # Howler wrapper, music ducking, mute
-tools/
-  simulate.ts             # runs N million spins → RTP, hit rate, volatility, feature frequency
-tests/
-  evaluate.test.ts, features.test.ts, wallet.test.ts, rng.test.ts
-public/assets/            # original sprites, atlases, audio
+    rng.ts                # seedable xoshiro128**, crypto seed by default
+    spin.ts, evaluate.ts  # stops → grid, payline/scatter/trigger evaluation
+    round.ts              # playRound: base spin + every bonus decided up front, max-win cap
+    stats.ts              # simulate(): RTP per part, trigger rates
+    features/             # freeSpins, lowriderHop, holdAndSpin, turfWar, driveBy, wanted, gamble
+  game/
+    GameController.ts     # bets, rounds, saving, menu, gamble, daily/rescue, leaderboard
+    presenters/           # play each bonus result back on screen
+  economy/                # wallet, progress (stats, achievements, settings), storage
+  leaderboard/            # LeaderboardService + LocalLeaderboard
+  audio/sound.ts          # Web Audio sound effects and music
+  view/                   # Pixi screens: reels, HUD, bars, banners, dialogs, menu, big win
+    art/                  # vector art for symbols, lowrider, cash bag
+    scenes/               # Lowrider Hop, Cash Run, Turf War, Car Chase, menu
+tools/simulate.ts         # npm run sim
+tests/                    # 63 Vitest tests, including a 200k-round maths check
 ```
 
-**Key rule:** the engine decides every outcome **before** the animation starts, and the view only plays it back. That keeps the math testable and lets the simulator run without rendering.
+**Key rule:** the engine decides every outcome **before** the animation starts (and the win is saved straight away), and the view only plays it back. That keeps the math testable and lets the simulator run without rendering.
 
 ---
 
@@ -242,7 +215,7 @@ Prep before use:
 | 9 | **Gamble** ✅ | GAMBLE ×2 button after a win (not during auto-spin): pick the left or right alley, 50/50 escape or bust, up to 5 rounds and 10× the win, COLLECT any time |
 | 10 | **Economy polish** ✅ | Daily allowance and broke rescue pop-ups, stats, 11 achievements with toasts, 3 unlockable reel skins, local leaderboard (big wins, multipliers, territories), MENU with pays/stats/trophies/leaders/settings; wins are saved the moment a round is decided |
 | 11 | **Art and audio pass** ✅ | Original vector art for every remaining symbol (OG, Sabre, house, chain, boombox, BMX, ball, cap, spray can, lowrider, graffiti letters) baked to textures; big-win screen (Nice → Respect → Big Smoke-sized → Kingpin) with coins; synthesised sound effects and a G-funk-style music loop, both switchable in Settings |
-| 12 | **QA and release** | Mobile layout, performance, re-run the simulator after all features, deploy to GitHub Pages |
+| 12 | **QA and release** ✅ | Final tuning to 95.8% RTP (10M rounds), portrait layout polish, production build checked, GitHub Pages workflow (enable Pages → GitHub Actions), README |
 
 After every feature milestone, re-run the simulator and keep the total RTP inside 95–97%.
 

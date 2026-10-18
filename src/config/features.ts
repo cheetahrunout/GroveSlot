@@ -48,7 +48,7 @@ export const CASH_RUN = {
   /** Respins given at the start and after every new Cash Bag. */
   respins: 3,
   /** Chance that an empty cell lands a Cash Bag on a respin. */
-  landChance: 0.027,
+  landChance: 0.025,
   /**
    * What a Cash Bag holds: a multiple of the total bet or a jackpot.
    * The Kingpin is only won by filling all 15 cells.
@@ -75,7 +75,7 @@ export const TURF_WAR = {
   /** Neighbourhoods to take, in order. */
   territories: ['GANTON', 'IDLEWOOD', 'JEFFERSON', 'GLEN PARK', 'WILLOWFIELD', 'EAST LS', 'EL CORONA', 'LITTLE MEXICO'],
   /** Chance of a surprise Turf War after a spin that won nothing and triggered nothing. */
-  randomChance: 1 / 500,
+  randomChance: 1 / 600,
   /** Taking every territory pays this × bet on top. */
   turfBossMultiplier: 100,
   /** Equal-sized wheel slices, clockwise from the top. */
@@ -97,7 +97,7 @@ export const TURF_WAR = {
 
 export const DRIVE_BY = {
   /** Chance per base-game spin. */
-  chance: 1 / 200,
+  chance: 1 / 300,
   minWilds: 1,
   maxWilds: 3,
 } as const;
