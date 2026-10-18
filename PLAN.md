@@ -14,7 +14,7 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 
 **Non-goals**
 - Real-money gambling, in-app purchases, ads, or any way to turn tokens into money or prizes.
-- Online multiplayer (maybe later: a local leaderboard only).
+- Online multiplayer. The leaderboard starts local but sits behind an interface, so an online one can be added later (see §5).
 
 **IP note:** GTA and its characters, logos, music and art belong to Rockstar. Use **original art and audio** that pays homage to the setting (green bandanas, lowriders, cul-de-sac, spray cans) instead of ripped assets, logos or soundtrack clips. Keep in-game names as homages or nicknames ("The Cul-de-sac", "OG", "Homie") so the project stays shareable.
 
@@ -74,10 +74,10 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 - Bandana wilds **expand** to the full reel.
 - Retrigger: 3+ Spray Cans adds +10 spins.
 
-### 4.2 Lowrider Hop (pick/skill-lite bonus)
+### 4.2 Lowrider Hop (just for fun, pure odds)
 - Triggered by 3 Lowriders on reels 1, 3 and 5.
-- Pick 1 of 3 lowriders, then a "hydraulics hop" mini-game: press at the right time on 5 rounds of a timing bar; higher hops pay more (2×–50× bet per hop).
-- The timing only adjusts the multiplier inside a fixed range, so the RTP stays predictable. The outcome table is still decided by the RNG, and the timing nudges you up or down one step.
+- Pick 1 of 3 lowriders (cosmetic), then watch it hop 5 times. Each hop pays 2×–50× bet; higher hops pay more.
+- **No skill involved.** The engine draws every hop height from a weighted table the moment the bonus triggers. Pressing "HOP" only plays the next animation, so the result is the same however or whenever you press.
 
 ### 4.3 Turf War (wheel / map bonus)
 - Triggered by 3 **Palm G** symbols on reels 2–4, or by a random **"Turf War!"** event after any non-winning spin (≈1 in 150).
@@ -116,6 +116,11 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 - Tokens can't be bought, transferred or redeemed. A "No real money, for fun only" notice sits on the title screen and in settings.
 - Optional cosmetics unlocked by **achievements** (not purchases): reel skins (night / sunset / rain), alternate bandana colours, a car horn sound.
 
+### Leaderboard (prepared, local first)
+- `LeaderboardService` interface with `submit()` / `top()`; categories: biggest win, biggest multiplier, territories taken.
+- `LocalLeaderboard` stores the top 50 per category in localStorage. An online version (for example a small serverless API) can implement the same interface later without UI changes.
+- The leaderboard screen itself comes with the economy polish milestone.
+
 ### Stats and achievements
 - Track total spins, biggest win, bonuses triggered, territories taken and time played.
 - Achievements: "All we had to do…" (first bonus), "Turf Boss", "Hydraulics King", "Kingpin", "Respect +" (1,000 spins).
@@ -151,7 +156,10 @@ src/
     wallet.ts             # balance, bet validation, daily handout, rescue
     storage.ts            # versioned localStorage with try/catch + migration
     achievements.ts
+  leaderboard/
+    leaderboard.ts        # LeaderboardService interface + LocalLeaderboard
   view/                   # Pixi rendering, listens to engine events
+    layout.ts             # design resolutions + scale-to-fit (landscape / portrait)
     ReelView.ts
     WinLineView.ts
     HUD.ts                # balance, bet, spin, auto, turbo
@@ -175,6 +183,12 @@ public/assets/            # original sprites, atlases, audio
 **Key rule:** the engine decides every outcome **before** the animation starts, and the view only plays it back. That keeps the math testable and lets the simulator run without rendering.
 
 ---
+
+### Screen layout (desktop first, mobile ready)
+- The scene is built at a fixed design resolution and scaled to fit with letterboxing (`src/view/layout.ts`).
+- **Landscape 1920×1080** is the main layout: reels in the centre, spin button on the right, balance and bet below.
+- **Portrait 1080×1920** is already wired up and used automatically on tall screens: reels on top, controls stacked below. It gets a proper polish pass in the QA milestone.
+- Use pointer events only (mouse and touch both work), keep buttons ≥ 88 design px, and avoid hover-only UI.
 
 ## 7. Art and audio direction
 
@@ -204,7 +218,7 @@ Prep before use:
 
 | # | Milestone | Deliverable |
 |---|---|---|
-| 1 | **Scaffold** | Vite + TS + Pixi + Vitest, lint/format, CI running tests |
+| 1 | **Scaffold** ✅ | Vite + TS + Pixi + Vitest, CI running tests, seeded RNG, layout system, leaderboard interface, placeholder grid |
 | 2 | **Engine core** | RNG, reel strips, spin, line evaluation, paytable; unit tests |
 | 3 | **Simulator** | `npm run sim`: 10M spins, reports RTP/hit rate; tune strips to about 96% |
 | 4 | **Base game UI** | Spinning reels with placeholder art, HUD, bet controls, win lines, wallet + localStorage |
@@ -229,8 +243,8 @@ After every feature milestone, re-run the simulator and keep the total RTP insid
 
 ---
 
-## 10. Open questions
-1. Paylines (20 lines) or 243 ways? The plan defaults to 20 lines.
-2. Should the Lowrider Hop timing be real skill, or purely cosmetic for the most predictable math?
-3. Desktop-first or mobile-first layout?
-4. Do you want a local high-score / biggest-win leaderboard?
+## 10. Decisions
+1. **Paylines:** 20 fixed lines (default; ways-to-win stays an option in the evaluator).
+2. **Lowrider Hop:** no skill, pure odds. The outcome is drawn when the bonus triggers.
+3. **Layout:** desktop first, with the portrait/mobile layout prepared from the start.
+4. **Leaderboard:** prepared now (interface + local storage); screen added in milestone 10.
