@@ -2,7 +2,9 @@ node_modules/
 dist/
 *.log
 .DS_Store
-dist-single/
-# One-file copy handed out for self-hosting; rebuild with npm run build:single
+*.db
+*.db-*
+test-results/
+playwright-report/
+# One-file copy handed out earlier; not part of the build.
 /lowrider.html
-dist-server/

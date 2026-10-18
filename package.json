@@ -2,33 +2,31 @@
   "name": "groveslot",
   "private": true,
   "version": "1.0.0",
-  "description": "Grove Street themed slot machine played with free tokens. For fun only, no real money.",
+  "description": "Lowrider: a Grove Street slot for Grove Casino.",
   "type": "module",
-  "scripts": {
-    "dev": "node tools/dev.mjs",
-    "dev:page": "vite",
-    "dev:server": "tsx watch server/main.ts",
-    "build": "tsc --noEmit && vite build --config vite.single.config.ts && npm run build:server",
-    "build:server": "esbuild server/main.ts --bundle --platform=node --target=node18 --format=esm --outfile=dist-server/server.mjs --log-level=warning",
-    "start": "node dist-server/server.mjs",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "sim": "tsx tools/simulate.ts",
-    "odds": "tsx tools/odds-check.ts"
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=24"
   },
-  "dependencies": {
-    "@fontsource/anton": "^5.3.0",
-    "@fontsource/permanent-marker": "^5.3.0",
-    "pixi.js": "^8.22.0"
+  "scripts": {
+    "dev": "pnpm --parallel --filter @lowrider/server --filter @lowrider/web run dev",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "pnpm --filter @lowrider/web run test:e2e",
+    "build": "pnpm -r run build",
+    "start": "pnpm --filter @lowrider/server run start",
+    "sim": "pnpm --filter @lowrider/shared run sim",
+    "odds": "pnpm --filter @lowrider/server run odds"
   },
   "devDependencies": {
-    "@types/node": "^22.20.5",
-    "tsx": "^4.23.15",
-    "typescript": "~5.9.3",
-    "vite": "^7.3.0",
-    "vite-plugin-singlefile": "^2.3.3",
-    "vitest": "^4.1.0",
-    "esbuild": "0.28.2"
+    "@eslint/js": "9.39.5",
+    "@types/node": "24.19.1",
+    "eslint": "9.39.5",
+    "eslint-plugin-vue": "10.11.1",
+    "globals": "17.13.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.0",
+    "vitest": "4.1.11"
   }
 }

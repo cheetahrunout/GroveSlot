@@ -28,11 +28,25 @@ Lowrider now runs as a Grove Casino game under the casino's contract (GAMES.md).
 - **No rerolls.** The Wanted Level's "guaranteed win" (which re-spun until it won) became a Payday prize drawn from a table.
 - **Control states, heartbeat, health, scores.** The casino's leaderboard replaces the local one.
 - Manifest `casino-game.json` (RTP 96.00%), Dockerfile and a GHCR image workflow. GitHub Pages hosting was dropped, because the page needs the server.
+- **Grove game technology standard.** The repo is a pnpm workspace (`apps/web`, `apps/server`, `packages/shared`): Vue 3 + Pinia own the HUD, menus and bonus prompts; PixiJS owns the canvas; Fastify + Zod + SQLite (round references and Wanted levels only) on Node 24 own the game. CI is the standard `build.yml` (numbered GHCR images `1.0.<n>`). The tables and trees in §2 and §6 below are updated to match.
 
 ## 2. Tech stack
 
 | Concern | Choice | Why |
 |---|---|---|
+| Workspace | **pnpm** workspace, TypeScript strict everywhere | Grove game technology standard |
+| Page | **Vue 3** (Composition API) + **Pinia** for UI state, built with **Vite** | HUD, menus, prompts and accessibility in real DOM |
+| Rendering | **PixiJS v8** canvas behind the Vue layer | Reels, bonus scenes, transitions and effects |
+| Styling | Grove design tokens as CSS variables (`apps/web/src/design/tokens.ts`), shared with Pixi | One palette and type scale for both layers |
+| Animation | Small promise-based tween helper on the Pixi ticker (`apps/web/src/view/tween.ts`) | Reel easing, win celebrations, turbo speed-up |
+| Audio | **Web Audio API** synth (`apps/web/src/audio/sound.ts`) | Every sound and the music loop are generated in code: no audio files, nothing borrowed |
+| Server | **Node.js 24 + Fastify**, **Zod** for every request | Server authority: rules, CSPRNG, rounds, payouts |
+| Persistence | **SQLite** (`node:sqlite`) for round references and Wanted levels; `localStorage` for cosmetic stats and settings | The casino holds all money |
+| Tests | **Vitest** (maths, RNG, rounds, recovery, HTTP) + **Playwright** smoke test | |
+| Fonts | Anton + Permanent Marker via `@fontsource` (bundled) | Graffiti look, works offline |
+| Deploy | Docker → GHCR (`build.yml`) → Portainer | |
+
+---|---|---|
 | Build | **Vite + TypeScript** | Fast dev loop, simple static deploy |
 | Rendering | **PixiJS v8** | WebGL sprites, smooth reel spins, particles |
 | Animation | Small promise-based tween helper on the Pixi ticker (`src/view/tween.ts`) | Reel easing, win celebrations, turbo speed-up |
@@ -147,29 +161,30 @@ Lowrider now runs as a Grove Casino game under the casino's contract (GAMES.md).
 ## 6. Architecture
 
 ```
-src/
-  main.ts                 # boots Pixi, wires controller + scene, dev-only debug hook
+apps/
+  server/src/
+    main.ts               # env, casino client, journal, heartbeat, control refresh, shutdown
+    app.ts                # Fastify: /health, JSON API, SSE events, cookies, rate limits, static page
+    game.ts               # LowriderGame: sessions, spin/gamble/collect as casino rounds, reconcile
+    casino.ts             # HTTP casino client (round open/settle/void, control, heartbeat, score)
+    fakeCasino.ts         # stand-in casino for local play and tests
+    journal.ts            # SQLite: round references + per-player Wanted level
+    rng.ts                # crypto.randomInt
+  web/src/
+    main.ts               # Pixi app + Vue app + Pinia, wires the controller
+    App.vue, components/  # header, HUD, action bar (bonus prompts), menu, status screens, toasts
+    stores/game.ts        # Pinia UI state
+    design/tokens.ts      # Grove tokens → CSS variables
+    game/                 # GameController, API client, presenters that play each bonus back
+    view/                 # Pixi scene: reels, transitions, big win, bonus scenes, art
+packages/shared/src/
   config/                 # symbols, paylines, paytable, reel strips, bonus settings, RTP budget
-  engine/                 # pure TS, no rendering → fully unit-testable
-    rng.ts                # seedable xoshiro128**, crypto seed by default
-    spin.ts, evaluate.ts  # stops → grid, payline/scatter/trigger evaluation
-    round.ts              # playRound: base spin + every bonus decided up front, max-win cap
-    stats.ts              # simulate(): RTP per part, trigger rates
-    features/             # freeSpins, lowriderHop, holdAndSpin, turfWar, driveBy, wanted, gamble
-  game/
-    GameController.ts     # bets, rounds, saving, menu, gamble, daily/rescue, leaderboard
-    presenters/           # play each bonus result back on screen
-  economy/                # wallet, progress (stats, achievements, settings), storage
-  leaderboard/            # LeaderboardService + LocalLeaderboard
-  audio/sound.ts          # Web Audio sound effects and music
-  view/                   # Pixi screens: reels, HUD, bars, banners, dialogs, menu, big win
-    art/                  # vector art for symbols, lowrider, cash bag
-    scenes/               # Lowrider Hop, Cash Run, Turf War, Car Chase, menu
-tools/simulate.ts         # npm run sim
-tests/                    # 63 Vitest tests, including a 200k-round maths check
+  engine/                 # pure TS round logic (playRound, evaluate, features/*), run by the server
+  api.ts                  # Zod request schemas + response types shared by server and page
+casino-game.json          # manifest
 ```
 
-**Key rule:** the engine decides every outcome **before** the animation starts (and the win is saved straight away), and the view only plays it back. That keeps the math testable and lets the simulator run without rendering.
+**Key rule:** the server decides every outcome **before** the animation starts (and the casino settles it straight away), and the page only plays it back. That keeps the math testable and lets the simulator run without rendering.
 
 ---
 

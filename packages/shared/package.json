@@ -1,0 +1,20 @@
+{
+  "name": "@lowrider/shared",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Lowrider game maths, configuration and the page/server contract.",
+  "type": "module",
+  "exports": {
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "sim": "tsx tools/simulate.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "tsx": "4.23.15"
+  }
+}

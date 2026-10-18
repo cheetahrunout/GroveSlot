@@ -1,0 +1,109 @@
+/* Layout and shared component styles, built on the Grove tokens (--grove-*). */
+:root {
+  color-scheme: dark;
+  --hud-gap: clamp(6px, 1.2vmin, 14px);
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--grove-color-background, #0d1a0d);
+  color: var(--grove-color-text, #e8f5e0);
+  font-family: var(--grove-font-body);
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  touch-action: manipulation;
+}
+
+#game-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  /* Clicks fall through to nothing below; interactive parts opt back in. */
+  pointer-events: none;
+}
+
+.g-button {
+  pointer-events: auto;
+  font-family: var(--grove-font-ui);
+  letter-spacing: 0.04em;
+  color: var(--grove-color-text);
+  background: var(--grove-color-grove);
+  border: 3px solid var(--grove-color-text);
+  border-radius: var(--grove-radius-md);
+  padding: 0.35em 0.9em;
+  font-size: clamp(14px, 2.2vmin, 24px);
+  cursor: pointer;
+  transition: transform 0.08s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.g-button:hover:not(:disabled) {
+  border-color: var(--grove-color-gold);
+}
+
+.g-button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.g-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.g-button:focus-visible {
+  outline: 4px solid var(--grove-color-gold);
+  outline-offset: 2px;
+}
+
+.g-button.is-gold {
+  background: var(--grove-color-gold);
+  color: var(--grove-color-background);
+}
+
+.g-button.is-danger {
+  background: var(--grove-color-danger);
+}
+
+.g-button.is-plain {
+  background: var(--grove-color-panel);
+}
+
+.g-button.is-on {
+  background: var(--grove-color-gold);
+  color: var(--grove-color-background);
+}
+
+.g-panel {
+  background: var(--grove-color-panel);
+  border: 3px solid var(--grove-color-panel-edge);
+  border-radius: var(--grove-radius-md);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

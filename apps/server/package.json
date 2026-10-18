@@ -1,0 +1,26 @@
+{
+  "name": "@lowrider/server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Lowrider game server: rules, CSPRNG, rounds and the Grove Casino connection.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/server.mjs --packages=external --alias:@lowrider/shared=../../packages/shared/src --log-level=warning",
+    "start": "node dist/server.mjs",
+    "typecheck": "tsc --noEmit",
+    "odds": "tsx tools/odds-check.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/rate-limit": "11.2.0",
+    "@fastify/static": "10.1.5",
+    "fastify": "5.12.5",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@lowrider/shared": "workspace:*",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.15"
+  }
+}
