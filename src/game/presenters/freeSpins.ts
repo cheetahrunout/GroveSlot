@@ -40,7 +40,7 @@ export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult)
       bar.update(i + 1, totalSoFar, multiplier, spin.tags, multiplier >= FREE_SPINS.maxMultiplier);
       void bar.pulseMultiplier();
       const levelSpins = spin.addedSpins - (spin.retriggered ? FREE_SPINS.retrigger : 0);
-      await banner.show(`×${multiplier} MULTIPLIER`, `HOOD TAGGED · +${levelSpins} SPINS`, 900);
+      await banner.show(`x${multiplier} MULTIPLIER`, `HOOD TAGGED · +${levelSpins} SPINS`, 900);
     }
     if (spin.retriggered) {
       await banner.show('RETRIGGER!', `+${FREE_SPINS.retrigger} FREE SPINS`, 900);

@@ -58,7 +58,7 @@ export class FreeSpinsBar extends Container {
 
   update(spin: number, total: number, multiplier: number, tags: number, maxed: boolean): void {
     this.counter.text = `FREE SPIN ${spin} / ${total}`;
-    this.multiplier.text = `×${multiplier}`;
+    this.multiplier.text = `x${multiplier}`;
     const filled = maxed ? FREE_SPINS.tagsPerLevel : tags % FREE_SPINS.tagsPerLevel;
     this.tagMarks.forEach((m, i) => (m.alpha = i < filled ? 1 : 0.12));
   }

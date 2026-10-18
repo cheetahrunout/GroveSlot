@@ -1,7 +1,9 @@
 import { Application } from 'pixi.js';
+import { Progress } from './economy/progress';
 import { Wallet } from './economy/wallet';
 import { createRng } from './engine/rng';
 import { GameController } from './game/GameController';
+import { LocalLeaderboard } from './leaderboard/leaderboard';
 import { loadAssets } from './view/assets';
 import { GameScene } from './view/GameScene';
 import { computeLayout } from './view/layout';
@@ -13,7 +15,8 @@ async function boot() {
   document.body.appendChild(app.canvas);
 
   const textures = await loadAssets();
-  const controller = new GameController(new Wallet(), createRng());
+  const progress = new Progress();
+  const controller = new GameController(new Wallet(), createRng(), progress, new LocalLeaderboard());
   const scene = new GameScene(textures, {
     spin: () => void controller.spin(),
     betDown: () => controller.changeBet(-1),
@@ -22,18 +25,23 @@ async function boot() {
     stopAuto: () => controller.stopAuto(),
     toggleTurbo: () => controller.toggleTurbo(),
     gamble: () => void controller.gamble(),
+    menu: () => void controller.openMenu(),
   });
   app.stage.addChild(scene);
-  controller.attach(scene);
-
   const relayout = () => scene.arrange(computeLayout(app.screen.width, app.screen.height));
   app.renderer.on('resize', relayout);
   relayout();
+  controller.attach(scene);
 
   if (import.meta.env.DEV) {
     // Debug hook for testing: __groveslot.controller.forceNext = 'freeSpins'
     (window as unknown as Record<string, unknown>).__groveslot = { controller, app };
   }
+
+  // Count time played while the tab is visible.
+  setInterval(() => {
+    if (document.visibilityState === 'visible') progress.addPlayTime(30_000);
+  }, 30_000);
 
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !e.repeat) {

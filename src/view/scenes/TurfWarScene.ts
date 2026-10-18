@@ -11,7 +11,7 @@ const SLICE_ANGLE = (Math.PI * 2) / TURF_WAR.wheel.length;
 const PRIZE_SHADES = ['#2f7d2f', '#3f9a3f'];
 
 function sliceLabel(s: WheelSlice): string {
-  if (s.type === 'prize') return `×${s.multiplier}`;
+  if (s.type === 'prize') return `x${s.multiplier}`;
   return s.type === 'backup' ? 'BACKUP' : 'BALLAS';
 }
 
@@ -151,7 +151,7 @@ export class TurfWarScene extends Container {
         this.status.text = 'THE BALLAS PUSHED YOU BACK';
         this.status.style.fill = '#c58cf0';
       }
-      this.backupText.text = spin.backups > 0 ? `BACKUP ×${spin.backups}` : '';
+      this.backupText.text = spin.backups > 0 ? `BACKUP x${spin.backups}` : '';
       this.totalText.text = `TOTAL ${fmt(total)}`;
       await wait(900);
     }

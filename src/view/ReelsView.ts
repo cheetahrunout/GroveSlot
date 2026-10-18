@@ -28,13 +28,12 @@ export class ReelsView extends Container {
   private grid: Grid = [];
   private labels = new Map<string, string>();
   private winLoop = 0;
+  private readonly frame = new Graphics();
 
   constructor(private readonly textures: GameTextures) {
     super();
-    const frame = new Graphics()
-      .roundRect(-FRAME_PAD, -FRAME_PAD, GRID_WIDTH + FRAME_PAD * 2, GRID_HEIGHT + FRAME_PAD * 2, 28)
-      .fill(COLORS.panel)
-      .stroke({ color: COLORS.panelEdge, width: 6 });
+    const frame = this.frame;
+    this.setFrameColor(COLORS.panelEdge);
     const mask = new Graphics().rect(0, 0, GRID_WIDTH, GRID_HEIGHT).fill(0xffffff);
     const reelLayer = new Container();
     reelLayer.mask = mask;
@@ -54,6 +53,14 @@ export class ReelsView extends Container {
   /** Width and height including the frame, for layout. */
   static readonly outerWidth = GRID_WIDTH + FRAME_PAD * 2;
   static readonly outerHeight = GRID_HEIGHT + FRAME_PAD * 2;
+
+  setFrameColor(color: string): void {
+    this.frame
+      .clear()
+      .roundRect(-FRAME_PAD, -FRAME_PAD, GRID_WIDTH + FRAME_PAD * 2, GRID_HEIGHT + FRAME_PAD * 2, 28)
+      .fill(COLORS.panel)
+      .stroke({ color, width: 6 });
+  }
 
   get currentGrid(): Grid {
     return this.grid;
@@ -250,13 +257,13 @@ export class ReelsView extends Container {
       this.overlay.addChild(this.drawLine(w.line, w.count));
       this.highlight(Array.from({ length: w.count }, (_, reel) => ({ reel, row: PAYLINES[w.line][reel] })));
       const sym = w.symbol === 'TEN' ? '10' : w.symbol;
-      this.setLineLabel(`LINE ${w.line + 1} · ${w.count}× ${sym} · ${(w.payout * multiplier).toLocaleString('en-US')}`);
+      this.setLineLabel(`LINE ${w.line + 1} · ${w.count}x ${sym} · ${(w.payout * multiplier).toLocaleString('en-US')}`);
     });
     if (result.scatterWin > 0) {
       steps.push(() => {
         this.overlay.removeChildren().forEach((c) => c.destroy());
         this.highlight(result.scatterPositions);
-        this.setLineLabel(`${result.scatterCount}× SPRAY CAN · ${(result.scatterWin * multiplier).toLocaleString('en-US')}`);
+        this.setLineLabel(`${result.scatterCount}x SPRAY CAN · ${(result.scatterWin * multiplier).toLocaleString('en-US')}`);
       });
     }
 

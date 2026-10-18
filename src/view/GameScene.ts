@@ -4,6 +4,8 @@ import { Banner } from './Banner';
 import { FreeSpinsBar } from './FreeSpinsBar';
 import { JackpotBar } from './JackpotBar';
 import { WantedMeter } from './WantedMeter';
+import { Toasts } from './Toast';
+import { SKINS, type SkinId } from '../economy/achievements';
 import { HUD, type HudHandlers } from './HUD';
 import type { Layout } from './layout';
 import { ReelsView } from './ReelsView';
@@ -17,6 +19,8 @@ export class GameScene extends Container {
   readonly freeSpinsBar = new FreeSpinsBar();
   readonly jackpots: JackpotBar;
   readonly wanted = new WantedMeter();
+  readonly toasts = new Toasts();
+  private skin: SkinId = 'classic';
   private mode: 'base' | 'freeSpins' = 'base';
   /** Full-screen layer for bonus games, above the reels and HUD. */
   readonly overlay = new Container();
@@ -41,7 +45,7 @@ export class GameScene extends Container {
     });
     this.disclaimer.anchor.set(0.5, 1);
     this.freeSpinsBar.visible = false;
-    this.addChild(this.backdrop, this.title, this.jackpots, this.wanted, this.freeSpinsBar, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner);
+    this.addChild(this.backdrop, this.title, this.jackpots, this.wanted, this.freeSpinsBar, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner, this.toasts);
   }
 
   setMode(mode: 'base' | 'freeSpins'): void {
@@ -55,8 +59,14 @@ export class GameScene extends Container {
 
   private drawBackdrop(): void {
     const { width: W, height: H } = this.layout;
-    const color = this.mode === 'freeSpins' ? COLORS.night : COLORS.background;
+    const color = this.mode === 'freeSpins' ? COLORS.night : SKINS[this.skin].backdrop;
     this.backdrop.clear().rect(0, 0, W, H).fill(color);
+  }
+
+  applySkin(skin: SkinId): void {
+    this.skin = skin;
+    this.reels.setFrameColor(SKINS[skin].frame);
+    if (this.layout) this.drawBackdrop();
   }
 
   arrange(layout: Layout): void {
@@ -70,6 +80,7 @@ export class GameScene extends Container {
     this.disclaimer.position.set(W / 2, H - 14);
     this.banner.position.set(W / 2, H / 2 - 60);
     this.jackpots.arrange(layout.mode, W);
+    this.toasts.areaWidth = W;
 
     if (layout.mode === 'landscape') {
       const spinColumn = 280;
@@ -82,6 +93,7 @@ export class GameScene extends Container {
       this.wanted.scale.set(1);
       this.wanted.position.set(hud.spin.x, 260);
       hud.gamble.position.set(hud.spin.x - 110, hud.spin.y + 150);
+      hud.menu.position.set(hud.spin.x - 85, 150 + ReelsView.outerHeight - 70 - 24);
 
       const y = 150 + ReelsView.outerHeight + 10;
       const gap = 24;
@@ -114,6 +126,7 @@ export class GameScene extends Container {
       hud.autoMenu.position.set(leftX + colW + gap, below + 130);
       hud.spin.position.set(W / 2, below + 420);
       hud.gamble.position.set(W / 2 + 160, below + 378);
+      hud.menu.position.set(W / 2 - 330, below + 385);
     }
   }
 }

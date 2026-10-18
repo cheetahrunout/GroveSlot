@@ -90,7 +90,8 @@ export class LowriderHopScene extends Container {
       options.addChild(slot);
     });
     this.addChild(options);
-    if (auto) void wait(1200).then(() => resolvePick(0));
+    // Picks for you during auto-spin, or if nobody taps for a while.
+    void wait(auto ? 1200 : 10_000).then(() => resolvePick(0));
 
     const choice = await picked;
     heading.destroy({ children: true });
@@ -115,7 +116,7 @@ export class LowriderHopScene extends Container {
       const rung = new Container();
       const bg = new Graphics();
       rung.y = -(level + 1) * rungH;
-      const label = new Text({ text: `×${entry.multiplier}`, style: textStyle(COLORS.gold, 34) });
+      const label = new Text({ text: `x${entry.multiplier}`, style: textStyle(COLORS.gold, 34) });
       label.anchor.set(0.5);
       label.position.set(110, (rungH - 8) / 2);
       rung.addChild(bg, label);

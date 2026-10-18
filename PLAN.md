@@ -122,10 +122,10 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 ## 5. Token economy (no real money)
 
 - New player: **10,000 tokens**.
-- **Daily handout** ("Sweet's allowance"): +2,000 tokens every 24 h.
+- **Daily allowance:** +2,000 tokens every 24 h, offered in a pop-up when you open the game.
 - **Broke rescue:** if your balance is below the minimum bet, a "Back on your feet" button gives +1,000 (with a cooldown of 1 per hour).
 - Tokens can't be bought, transferred or redeemed. A "No real money, for fun only" notice sits on the title screen and in settings.
-- Optional cosmetics unlocked by **achievements** (not purchases): reel skins (night / sunset / rain), alternate bandana colours, a car horn sound.
+- Cosmetics unlocked by **achievements** (not purchases): reel skins Night Shift (Tagger), Sunset Cruise (Hydraulics King) and Rainy Block (Turf Boss).
 
 ### Leaderboard (prepared, local first)
 - `LeaderboardService` interface with `submit()` / `top()`; categories: biggest win, biggest multiplier, territories taken.
@@ -133,8 +133,9 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 - The leaderboard screen itself comes with the economy polish milestone.
 
 ### Stats and achievements
-- Track total spins, biggest win, bonuses triggered, territories taken and time played.
-- Achievements: "All we had to do…" (first bonus), "Turf Boss", "Hydraulics King", "Kingpin", "Respect +" (1,000 spins).
+- Tracked: spins, tokens bet and won, biggest win, each bonus, territories, Kingpins, Wanted paydays, Drive-Bys, best Car Chase streak and time played (MENU → STATS).
+- 11 achievements (MENU → TROPHIES): All We Had To Do… (first bonus), Tagger, Hydraulics King, Bag Man, Kingpin, Turf Boss, Most Wanted, Drive-By, Escape Artist, Respect (50× win) and Respect + (1,000 spins). New ones pop up as a toast.
+- MENU also has the paytable at your bet (PAYS), the local leaderboard (LEADERS) and SETTINGS: gamble offer, sound, music, player name and reel skin.
 
 ---
 
@@ -238,7 +239,7 @@ Prep before use:
 | 7 | **Hold & Spin + Jackpots** ✅ | Stacked Cash Bags with values, 6+ start Cash Run: 3 respins that reset on every new bag, collect screen, Homie/Soldier/OG bag jackpots, Kingpin (1,000× + pot) for all 15 cells, jackpot meter, saved pot; ≈ 7.7% RTP |
 | 8 | **Turf War + Drive-By + Wanted Level** ✅ | Turf War wheel (prizes, Backup, Ballas) and Los Santos map with Turf Boss; Drive-By car spraying 1–3 wilds; Wanted stars with a guaranteed 5× payday; total RTP ≈ 97% before final tuning |
 | 9 | **Gamble** ✅ | GAMBLE ×2 button after a win (not during auto-spin): pick the left or right alley, 50/50 escape or bust, up to 5 rounds and 10× the win, COLLECT any time |
-| 10 | **Economy polish** | Daily handout, rescue, stats, achievements, cosmetic unlocks |
+| 10 | **Economy polish** ✅ | Daily allowance and broke rescue pop-ups, stats, 11 achievements with toasts, 3 unlockable reel skins, local leaderboard (big wins, multipliers, territories), MENU with pays/stats/trophies/leaders/settings; wins are saved the moment a round is decided |
 | 11 | **Art and audio pass** | Replace placeholders, big-win celebrations, music |
 | 12 | **QA and release** | Mobile layout, performance, re-run the simulator after all features, deploy to GitHub Pages |
 
