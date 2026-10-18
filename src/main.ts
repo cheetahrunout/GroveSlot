@@ -2,8 +2,9 @@ import { Application, Assets, Container, Graphics, Rectangle, Sprite, Text, Text
 import { PAYLINES } from './config/paylines';
 import { BASE_REELS, REEL_COUNT as REELS, ROW_COUNT as ROWS } from './config/reels';
 import type { SymbolId } from './config/symbols';
-import { evaluate, type Evaluation } from './engine/evaluate';
+import type { Evaluation } from './engine/evaluate';
 import { createRng } from './engine/rng';
+import { INITIAL_STATE, playRound } from './engine/round';
 import { spinReels, type Grid } from './engine/spin';
 import { computeLayout, type Layout } from './view/layout';
 
@@ -121,6 +122,7 @@ async function boot() {
     ({ fill, fontSize, fontWeight: '900', fontFamily: 'Impact, sans-serif' }) as const;
 
   let tokens = START_BALANCE;
+  let gameState = INITIAL_STATE;
   const balance = new Text({ text: '', style: textStyle('#f2d36b', 48) });
   balance.anchor.set(0.5);
   const message = new Text({ text: `BET ${TOTAL_BET} · 20 LINES`, style: textStyle('#e8f5e0', 40) });
@@ -134,11 +136,12 @@ async function boot() {
       return;
     }
     tokens -= TOTAL_BET;
-    const { grid: symbols } = spinReels(rng, BASE_REELS);
-    const result = evaluate(symbols, LINE_BET);
-    tokens += result.totalWin;
+    const round = playRound(rng, gameState, LINE_BET);
+    gameState = round.state;
+    const result = round.result.base;
+    tokens += round.result.totalWin;
     updateBalance();
-    showGrid(symbols, winningCells(result));
+    showGrid(round.result.grid, winningCells(result));
 
     const parts = result.totalWin > 0 ? [`WIN ${result.totalWin.toLocaleString('en-US')}`] : [];
     for (const key of Object.keys(TRIGGER_TEXT) as (keyof Evaluation['triggers'])[]) {

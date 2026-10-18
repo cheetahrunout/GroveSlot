@@ -231,7 +231,7 @@ Prep before use:
 |---|---|---|
 | 1 | **Scaffold** ✅ | Vite + TS + Pixi + Vitest, CI running tests, seeded RNG, layout system, leaderboard interface, placeholder grid |
 | 2 | **Engine core** ✅ | Reel strips, spin, line evaluation, paytable, bonus triggers; unit tests; wired into the placeholder screen |
-| 3 | **Simulator** | `npm run sim`: 10M spins, reports RTP/hit rate; tune strips to about 96% |
+| 3 | **Simulator** ✅ | `npm run sim -- [rounds] [seed]` reports RTP, hit rate, biggest win and trigger rates; a 200k-round test guards the maths in CI |
 | 4 | **Base game UI** | Spinning reels with placeholder art, HUD, bet controls, win lines, wallet + localStorage |
 | 5 | **Free Spins** | Scatter trigger, expanding wilds, Tag the Hood multiplier, retriggers |
 | 6 | **Lowrider Hop** | Pick + timing mini-game scene |
