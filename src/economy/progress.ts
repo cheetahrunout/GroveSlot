@@ -2,11 +2,6 @@ import type { FeatureKey, RoundResult } from '../engine/round';
 import { ACHIEVEMENTS, SKINS, type Achievement, type SkinId } from './achievements';
 import { load, save, type KeyValueStore } from './storage';
 
-export const DAILY_ALLOWANCE = 2000;
-export const DAILY_INTERVAL_MS = 24 * 60 * 60 * 1000;
-export const RESCUE_AMOUNT = 1000;
-export const RESCUE_COOLDOWN_MS = 60 * 60 * 1000;
-
 export interface Stats {
   spins: number;
   totalBet: number;
@@ -29,7 +24,6 @@ export interface Stats {
 }
 
 export interface Settings {
-  name: string;
   gamble: boolean;
   sound: boolean;
   music: boolean;
@@ -40,8 +34,6 @@ interface ProgressData {
   stats: Stats;
   /** Achievement id → unlock time. */
   achievements: Record<string, number>;
-  lastDaily: number;
-  lastRescue: number;
   settings: Settings;
 }
 
@@ -65,12 +57,15 @@ const emptyStats = (): Stats => ({
   playTimeMs: 0,
 });
 
-const DEFAULT_SETTINGS: Settings = { name: 'PLAYER', gamble: true, sound: true, music: true, skin: 'classic' };
+const DEFAULT_SETTINGS: Settings = { gamble: true, sound: true, music: true, skin: 'classic' };
 
 const KEY = 'progress';
 const VERSION = 1;
 
-/** Stats, achievements, free top-ups and settings, saved between visits. */
+/**
+ * Stats, achievements and display settings, saved in this browser. Purely
+ * for show: balances and results live with the casino and the game server.
+ */
 export class Progress {
   private data: ProgressData;
 
@@ -79,8 +74,6 @@ export class Progress {
     this.data = {
       stats: { ...emptyStats(), ...(loaded.stats ?? {}) },
       achievements: { ...(loaded.achievements ?? {}) },
-      lastDaily: Number(loaded.lastDaily) || 0,
-      lastRescue: Number(loaded.lastRescue) || 0,
       settings: { ...DEFAULT_SETTINGS, ...(loaded.settings ?? {}) },
     };
     this.data.stats.featureCounts = { ...emptyStats().featureCounts, ...this.data.stats.featureCounts };
@@ -131,7 +124,7 @@ export class Progress {
       s.territoriesTaken += turf.territoriesTaken;
       if (turf.turfBoss) s.turfBosses++;
     }
-    if (r.guaranteed) s.paydays++;
+    if (r.payday > 0) s.paydays++;
     if (r.driveBy) s.driveBys++;
     return this.checkAchievements(now);
   }
@@ -154,31 +147,6 @@ export class Progress {
     for (const a of fresh) this.data.achievements[a.id] = now;
     this.persist();
     return fresh;
-  }
-
-  /** Milliseconds until the daily allowance can be claimed (0 = now). */
-  dailyWait(now = Date.now()): number {
-    return Math.max(0, this.data.lastDaily + DAILY_INTERVAL_MS - now);
-  }
-
-  /** Returns the tokens to credit, or 0 if it is not time yet. */
-  claimDaily(now = Date.now()): number {
-    if (this.dailyWait(now) > 0) return 0;
-    this.data.lastDaily = now;
-    this.persist();
-    return DAILY_ALLOWANCE;
-  }
-
-  rescueWait(now = Date.now()): number {
-    return Math.max(0, this.data.lastRescue + RESCUE_COOLDOWN_MS - now);
-  }
-
-  /** "Back on your feet": only when the balance cannot cover the smallest bet. */
-  claimRescue(balance: number, minBet: number, now = Date.now()): number {
-    if (balance >= minBet || this.rescueWait(now) > 0) return 0;
-    this.data.lastRescue = now;
-    this.persist();
-    return RESCUE_AMOUNT;
   }
 
   private persist(): void {

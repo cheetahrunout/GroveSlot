@@ -7,6 +7,7 @@ import type { Grid } from '../engine/spin';
 import type { GameTextures } from './assets';
 import { sound } from '../audio/sound';
 import { createLowrider } from './art/lowrider';
+import { euro } from './format';
 import { createSymbolView } from './SymbolView';
 import { COLORS, LINE_COLORS, textStyle } from './theme';
 import { easeOutBack, easeOutCubic, linear, tween, wait } from './tween';
@@ -264,13 +265,13 @@ export class ReelsView extends Container {
       this.overlay.addChild(this.drawLine(w.line, w.count));
       this.highlight(Array.from({ length: w.count }, (_, reel) => ({ reel, row: PAYLINES[w.line][reel] })));
       const sym = w.symbol === 'TEN' ? '10' : w.symbol;
-      this.setLineLabel(`LINE ${w.line + 1} · ${w.count}x ${sym} · ${(w.payout * multiplier).toLocaleString('en-US')}`);
+      this.setLineLabel(`LINE ${w.line + 1} · ${w.count}x ${sym} · ${euro(w.payout * multiplier)}`);
     });
     if (result.scatterWin > 0) {
       steps.push(() => {
         this.overlay.removeChildren().forEach((c) => c.destroy());
         this.highlight(result.scatterPositions);
-        this.setLineLabel(`${result.scatterCount}x SPRAY CAN · ${(result.scatterWin * multiplier).toLocaleString('en-US')}`);
+        this.setLineLabel(`${result.scatterCount}x SPRAY CAN · ${euro(result.scatterWin * multiplier)}`);
       });
     }
 

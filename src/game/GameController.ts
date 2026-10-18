@@ -1,106 +1,163 @@
-import { WANTED } from '../config/features';
-import { BASE_REELS } from '../config/reels';
+import { GAMBLE } from '../config/features';
+import { PAYLINES } from '../config/paylines';
+import { BASE_REELS, ROW_COUNT } from '../config/reels';
 import { SKINS } from '../economy/achievements';
-import { DAILY_ALLOWANCE, RESCUE_AMOUNT, type Progress, type Settings } from '../economy/progress';
-import { load, save } from '../economy/storage';
-import type { Wallet } from '../economy/wallet';
-import { playGamble } from '../engine/features/gamble';
-import type { Rng } from '../engine/rng';
-import { INITIAL_STATE, playRound, type FeatureKey, type GameState, type RoundResult } from '../engine/round';
-import { spinReels } from '../engine/spin';
-import type { LeaderboardService } from '../leaderboard/leaderboard';
+import type { Progress, Settings } from '../economy/progress';
+import type { FeatureKey, RoundResult } from '../engine/round';
 import { sound } from '../audio/sound';
 import { bigWinTier, showBigWin } from '../view/BigWin';
-import { showDialog } from '../view/Dialog';
-import { bagLabels } from '../view/format';
+import { bagLabels, euro, money } from '../view/format';
 import type { GameScene } from '../view/GameScene';
 import { CarChaseScene } from '../view/scenes/CarChaseScene';
 import { MenuPanel } from '../view/scenes/MenuPanel';
-import { TRANSITION_COLORS, playTransition } from '../view/Transition';
+import type { StatusMessage } from '../view/StatusOverlay';
 import { COLORS } from '../view/theme';
-import { countUp, timing, wait } from '../view/tween';
-import { fmt, type PresentContext } from './presenters/context';
+import { TRANSITION_COLORS, playTransition } from '../view/Transition';
+import { timing, wait } from '../view/tween';
+import { ApiError, api, type PublicState } from './api';
+import type { PresentContext } from './presenters/context';
 import { presentFreeSpins } from './presenters/freeSpins';
 import { presentHoldAndSpin } from './presenters/holdAndSpin';
 import { presentLowriderHop } from './presenters/lowriderHop';
 import { presentTurfWar } from './presenters/turfWar';
 
-function loadGameState(): GameState {
-  const saved = load<GameState>('game', 1, INITIAL_STATE);
-  const pot = Number(saved?.kingpinPot);
-  const stars = Number(saved?.wanted?.stars);
-  const streak = Number(saved?.wanted?.lossStreak);
-  return {
-    kingpinPot: Number.isFinite(pot) && pot >= 0 ? pot : 0,
-    wanted: {
-      stars: Number.isInteger(stars) && stars >= 0 && stars <= WANTED.maxStars ? stars : 0,
-      lossStreak: Number.isInteger(streak) && streak >= 0 ? streak : 0,
-    },
-  };
-}
-
 /** Big wins stop auto-spin, as a multiple of the total bet. */
 const AUTO_STOP_WIN = 25;
-/** Rounds worth a leaderboard entry, as a multiple of the total bet. */
-const LEADERBOARD_MIN_MULTIPLIER = 10;
+const BET_PREF_KEY = 'groveslot:betCents';
 
-/** Runs the game: takes bets, plays rounds, presents them and keeps score. */
+function savedBet(): number {
+  try {
+    return Number(localStorage.getItem(BET_PREF_KEY)) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Runs the page side of Lowrider. It sends the player's intentions (spin,
+ * gamble pick) to the game server and plays back what comes back. It never
+ * decides an outcome and never holds money: the balance shown is the one
+ * the casino reported.
+ */
 export class GameController {
   private busy = false;
   private autoRemaining: number | null = null;
   private turbo = false;
-  private state: GameState = loadGameState();
   private scene!: GameScene;
   private roundWin = 0;
-  /** The last round's win, while the Car Chase gamble is on offer. */
-  private gambleOffer = 0;
-  /** Debug only: the next spin triggers this feature. */
-  forceNext: FeatureKey | undefined;
-  /** Debug only: the next spin gets a Drive-By. */
-  forceDriveBy = false;
+  private state: PublicState | null = null;
+  private lobbyUrl = '';
+  private hasSession = false;
+  private betCents = savedBet();
+  /** Local play only: the next spin triggers this (the server ignores it with the real casino). */
+  forceNext: FeatureKey | 'driveBy' | undefined;
 
-  constructor(
-    private readonly wallet: Wallet,
-    private readonly rng: Rng,
-    private readonly progress: Progress,
-    private readonly leaderboard: LeaderboardService,
-  ) {}
+  constructor(private readonly progress: Progress) {}
 
-  attach(scene: GameScene): void {
+  async attach(scene: GameScene): Promise<void> {
     this.scene = scene;
     scene.applySkin(this.progress.settings.skin);
     sound.setSfx(this.progress.settings.sound);
     sound.setMusic(this.progress.settings.music);
-    scene.reels.show(spinReels(this.rng, BASE_REELS).grid);
-    this.refreshHud();
+    // A still frame of the real strips until the first spin.
+    scene.reels.show(BASE_REELS.map((strip) => strip.slice(0, ROW_COUNT)));
     scene.hud.win.setValue('—');
-    void this.offerDaily();
+    scene.hud.gamble.visible = false;
+
+    // The casino sends players here with a one-time token: use it once, then drop it from the URL.
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('gc_token');
+    if (token) {
+      params.delete('gc_token');
+      const query = params.toString();
+      window.history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+    }
+    try {
+      const welcome = await api.openSession(token);
+      this.lobbyUrl = welcome.lobbyUrl;
+      this.hasSession = true;
+      this.applyState(welcome.state);
+    } catch (e) {
+      const body = e instanceof ApiError ? e.body : {};
+      this.lobbyUrl = typeof body.lobbyUrl === 'string' ? body.lobbyUrl : '';
+      if (body.state) this.applyState(body.state as PublicState);
+      this.showStatus();
+      if (!(e instanceof ApiError) || e.status !== 401) this.showError(e);
+    }
+
+    api.events((c) => {
+      if (!this.state) return;
+      const reopened = this.state.status !== 'live' && c.status === 'live';
+      this.state = { ...this.state, status: c.status, reason: c.reason };
+      // A halt closes every session: only the lobby can open a new one.
+      if (c.status === 'halted' || c.status === 'maintenance') this.hasSession = false;
+      if (c.status !== 'live') {
+        this.stopAuto();
+        this.state.gamble = null;
+      }
+      this.refreshHud();
+      this.showStatus();
+      if (reopened && this.hasSession) void api.state().then((w) => this.applyState(w.state), () => undefined);
+    });
+    window.addEventListener('pagehide', () => api.leave());
+  }
+
+  // --- state ---------------------------------------------------------------
+
+  private applyState(state: PublicState): void {
+    this.state = state;
+    const options = state.betOptions;
+    if (options.length > 0 && !options.includes(this.betCents)) {
+      // Keep the player's bet when the limits allow it, else the closest one below.
+      this.betCents = [...options].reverse().find((b) => b <= this.betCents) ?? options[0];
+    }
+    this.refreshHud();
+    this.showStatus();
   }
 
   private refreshHud(): void {
-    const hud = this.scene.hud;
-    hud.balance.setValue(fmt(this.wallet.balance));
-    hud.bet.setValue(fmt(this.wallet.totalBet));
-    this.scene.jackpots.update(this.wallet.totalBet, this.state.kingpinPot);
-    this.scene.wanted.setStars(this.state.wanted.stars);
+    const { hud, jackpots, wanted } = this.scene;
+    hud.balance.setValue(money(this.state?.balance ?? null));
+    hud.bet.setValue(this.betCents > 0 ? euro(this.betCents) : '—');
+    jackpots.update(this.betCents);
+    wanted.setStars(this.state?.wantedStars ?? 0);
+    hud.gamble.visible = !!this.state?.gamble && this.progress.settings.gamble && this.autoRemaining === null && !this.busy;
+    if (!this.busy) hud.spin.setEnabled(this.hasSession && this.state?.status === 'live' && this.betCents > 0);
   }
 
-  /** Runs `task` with the controls locked. */
-  private async locked<T>(task: () => Promise<T>): Promise<T | null> {
-    if (this.busy) return null;
-    this.busy = true;
-    this.scene.hud.setBusy(true);
-    try {
-      return await task();
-    } finally {
-      this.busy = false;
-      this.scene.hud.setBusy(false);
-    }
+  private statusMessage(): StatusMessage | null {
+    const s = this.state;
+    const lobbyUrl = this.lobbyUrl;
+    if (s?.status === 'halted') return { mode: 'full', title: 'GAME PAUSED', body: s.reason || 'Lowrider is paused by the casino. Any open round was refunded.', lobbyUrl };
+    if (s?.status === 'maintenance') return { mode: 'full', title: 'MAINTENANCE', body: s.reason || 'Lowrider is closed for planned work. Any open round was refunded.', lobbyUrl };
+    if (!this.hasSession) return { mode: 'full', title: 'LOWRIDER', body: 'Open Lowrider from the Grove Casino lobby to play.', lobbyUrl };
+    if (s?.status === 'last_bets') return { mode: 'strip', title: 'LAST BETS', body: s.reason || 'No new spins: the game is closing for a moment.' };
+    if (s && s.betOptions.length === 0) return { mode: 'full', title: 'NO OPEN BETS', body: 'The casino limits leave no bet open right now.', lobbyUrl };
+    return null;
   }
+
+  private showStatus(): void {
+    this.scene.status.show(this.statusMessage());
+  }
+
+  private showError(e: unknown): void {
+    const message = e instanceof Error ? e.message : 'Something went wrong.';
+    void this.scene.banner.show('HOLD UP', message, 2200, COLORS.danger);
+  }
+
+  // --- controls --------------------------------------------------------------
 
   changeBet(direction: 1 | -1): void {
-    if (this.busy) return;
-    this.wallet.changeBet(direction);
+    if (this.busy || !this.state) return;
+    const options = this.state.betOptions;
+    const next = options[options.indexOf(this.betCents) + direction];
+    if (next === undefined) return;
+    this.betCents = next;
+    try {
+      localStorage.setItem(BET_PREF_KEY, String(next));
+    } catch {
+      // Remembering the bet is a convenience only.
+    }
     this.refreshHud();
   }
 
@@ -135,57 +192,29 @@ export class GameController {
       await wait(result.totalWin > 0 ? 700 : 250);
     }
     this.stopAuto();
+    this.refreshHud();
   }
 
-  // --- Free tokens -------------------------------------------------------
-
-  private async offerDaily(): Promise<void> {
-    if (this.progress.dailyWait() > 0) return;
-    await this.locked(async () => {
-      await showDialog(this.scene.overlay, this.scene.layout, 'DAILY ALLOWANCE', `Your daily ${fmt(DAILY_ALLOWANCE)} free tokens are here.`, [
-        { label: `CLAIM +${fmt(DAILY_ALLOWANCE)}`, value: 'claim', fill: COLORS.gold, textColor: COLORS.background },
-      ]);
-      const amount = this.progress.claimDaily();
-      if (amount > 0) this.wallet.credit(amount);
-      this.refreshHud();
-    });
-  }
-
-  /** Called when the balance cannot cover the bet. */
-  private async handleBroke(): Promise<void> {
-    const { scene, wallet, progress } = this;
-    this.stopAuto();
-    if (wallet.balance >= wallet.minTotalBet) {
-      void scene.banner.show('NOT ENOUGH TOKENS', 'Lower your bet', 1200, COLORS.danger);
-      return;
+  /** Runs `task` with the controls locked. */
+  private async locked<T>(task: () => Promise<T>): Promise<T | null> {
+    if (this.busy) return null;
+    this.busy = true;
+    this.scene.hud.setBusy(true);
+    try {
+      return await task();
+    } finally {
+      this.busy = false;
+      this.scene.hud.setBusy(false);
     }
-    await this.locked(async () => {
-      const rescueIn = progress.rescueWait();
-      if (rescueIn > 0) {
-        const minutes = Math.ceil(rescueIn / 60000);
-        const daily = Math.ceil(progress.dailyWait() / 3_600_000);
-        await showDialog(scene.overlay, scene.layout, 'OUT OF TOKENS', `Next free top-up in ${minutes} min. Daily allowance in ${daily} h.`, [
-          { label: 'OK', value: 'ok' },
-        ]);
-        return;
-      }
-      await showDialog(scene.overlay, scene.layout, 'BACK ON YOUR FEET', `Out of tokens? Here are ${fmt(RESCUE_AMOUNT)} free ones. Once an hour.`, [
-        { label: `TAKE +${fmt(RESCUE_AMOUNT)}`, value: 'take', fill: COLORS.gold, textColor: COLORS.background },
-      ]);
-      const amount = progress.claimRescue(wallet.balance, wallet.minTotalBet);
-      if (amount > 0) wallet.credit(amount);
-      this.refreshHud();
-    });
   }
 
-  // --- Menu and settings -------------------------------------------------
+  // --- menu --------------------------------------------------------------
 
   async openMenu(): Promise<void> {
     await this.locked(async () => {
       const panel = new MenuPanel(this.scene.layout, {
         progress: this.progress,
-        leaderboard: this.leaderboard,
-        lineBet: this.wallet.lineBet,
+        lineBetCents: this.betCents / PAYLINES.length,
         onSettings: (patch) => this.applySettings(patch),
       });
       this.scene.overlay.addChild(panel);
@@ -199,61 +228,68 @@ export class GameController {
     if (patch.skin) this.scene.applySkin(patch.skin);
     if (patch.sound !== undefined) sound.setSfx(patch.sound);
     if (patch.music !== undefined) sound.setMusic(patch.music);
-    if (patch.gamble === false) this.setGambleOffer(0);
+    this.refreshHud();
   }
 
-  // --- Car Chase ---------------------------------------------------------
+  // --- Car Chase -----------------------------------------------------------
 
-  private setGambleOffer(amount: number): void {
-    this.gambleOffer = amount;
-    this.scene.hud.gamble.visible = amount > 0;
-  }
-
-  /** Car Chase: risk the last win on a 50/50 for double. */
+  /** Car Chase: each pick is its own round on the server, settled by the casino. */
   async gamble(): Promise<void> {
-    const offer = this.gambleOffer;
-    if (offer <= 0) return;
+    const offer = this.state?.gamble;
+    if (!offer || this.state?.status !== 'live') return;
     await this.locked(async () => {
-      const { scene, wallet } = this;
-      this.setGambleOffer(0);
-      wallet.debit(offer);
-      let final = 0;
-      try {
-        let view!: CarChaseScene;
-        let chase!: Promise<number>;
-        await playTransition(scene.overlay, scene.layout, {
-          colors: TRANSITION_COLORS.carChase,
-          title: 'CAR CHASE',
-          sub: `${fmt(offer)} ON THE LINE`,
-          hold: 700,
-          onCovered: () => {
-            view = new CarChaseScene(scene.layout);
-            scene.overlay.addChildAt(view, 0);
-            chase = view.play(offer, (pick, stake) => {
-              const outcome = playGamble(this.rng, pick, stake);
-              this.toastAchievements(this.progress.recordChase(outcome.won));
-              return outcome;
-            });
-          },
-        });
-        final = await chase;
-        await playTransition(scene.overlay, scene.layout, {
-          colors: TRANSITION_COLORS.carChase,
-          onCovered: () => view.destroy({ children: true }),
-        });
-      } finally {
-        wallet.credit(final);
+      const { scene } = this;
+      scene.hud.gamble.visible = false;
+      let view!: CarChaseScene;
+      let chase!: Promise<number>;
+      await playTransition(scene.overlay, scene.layout, {
+        colors: TRANSITION_COLORS.carChase,
+        title: 'CAR CHASE',
+        sub: `${euro(offer.stake)} ON THE LINE`,
+        hold: 700,
+        onCovered: () => {
+          view = new CarChaseScene(scene.layout);
+          scene.overlay.addChildAt(view, 0);
+          chase = view.play(
+            offer.stake,
+            async (pick) => {
+              try {
+                const answer = await api.gamble(pick);
+                this.state = answer.state;
+                this.toastAchievements(this.progress.recordChase(answer.won));
+                return answer;
+              } catch (e) {
+                if (e instanceof ApiError && e.body.balance) {
+                  this.state = { ...this.state!, balance: e.body.balance as PublicState['balance'] };
+                }
+                throw e;
+              }
+            },
+            GAMBLE.maxRounds,
+          );
+        },
+      });
+      const final = await chase;
+      if (this.state?.gamble) {
+        this.state = await api.collect().then(
+          (a) => a.state,
+          () => ({ ...this.state!, gamble: null }),
+        );
       }
-      scene.hud.win.setValue(final > 0 ? fmt(final) : '—');
-      this.refreshHud();
+      await playTransition(scene.overlay, scene.layout, {
+        colors: TRANSITION_COLORS.carChase,
+        onCovered: () => view.destroy({ children: true }),
+      });
+      scene.hud.win.setValue(final > 0 ? euro(final) : '—');
     });
+    this.refreshHud();
   }
 
-  // --- Rounds ------------------------------------------------------------
+  // --- rounds ------------------------------------------------------------
 
   private addWin(amount: number): void {
     this.roundWin += amount;
-    this.scene.hud.win.setValue(fmt(this.roundWin));
+    this.scene.hud.win.setValue(euro(this.roundWin));
   }
 
   private toastAchievements(list: { name: string; description: string; unlocks?: keyof typeof SKINS }[]): void {
@@ -277,46 +313,38 @@ export class GameController {
     if (turfWar) await wait(400).then(() => presentTurfWar(ctx, turfWar));
   }
 
-  private submitScores(result: RoundResult): void {
-    const name = this.progress.settings.name;
-    const at = Date.now();
-    const multiplier = result.totalWin / result.totalBet;
-    if (multiplier >= LEADERBOARD_MIN_MULTIPLIER) {
-      void this.leaderboard.submit('biggestWin', { name, score: result.totalWin, at });
-      void this.leaderboard.submit('biggestMultiplier', { name, score: Math.round(multiplier * 10) / 10, at });
-    }
-    const taken = result.features.turfWar?.territoriesTaken ?? 0;
-    if (taken > 0) void this.leaderboard.submit('territoriesTaken', { name, score: taken, at });
-  }
-
-  /** Plays one round. Returns null when the spin could not start. */
+  /** Plays one round. Returns null when the spin did not happen. */
   async spin(): Promise<RoundResult | null> {
-    if (this.busy) return null;
-    if (!this.wallet.canAfford()) {
-      await this.handleBroke();
+    if (this.busy || !this.hasSession || this.state?.status !== 'live' || this.betCents <= 0) {
+      this.showStatus();
       return null;
     }
-    return this.locked(async () => {
-      const { scene, wallet } = this;
-      this.setGambleOffer(0);
-      wallet.placeBet();
-      this.refreshHud();
+    const played = await this.locked(async () => {
+      const { scene } = this;
+      scene.hud.gamble.visible = false;
       scene.hud.win.setValue('—');
 
-      const force = this.forceDriveBy ? 'driveBy' : this.forceNext;
-      const { result, state } = playRound(this.rng, this.state, wallet.lineBet, { force });
-      this.forceNext = undefined;
-      this.forceDriveBy = false;
-      // The outcome is final: pay and save it now, then show it.
-      this.state = state;
-      save('game', 1, state);
-      wallet.credit(result.totalWin);
-      const shownBalance = wallet.balance - result.totalWin;
+      // The server opens the round with the casino, decides it and settles it before answering.
+      let answer;
+      try {
+        answer = await api.spin(this.betCents, import.meta.env.DEV ? this.forceNext : undefined);
+      } catch (e) {
+        this.stopAuto();
+        if (e instanceof ApiError) {
+          if (e.body.balance) this.state = { ...this.state!, balance: e.body.balance as PublicState['balance'] };
+          if (e.status === 401) this.hasSession = false;
+        }
+        this.showStatus();
+        this.showError(e);
+        return null;
+      } finally {
+        this.forceNext = undefined;
+      }
+      const { result, state } = answer;
       const unlocked = this.progress.recordRound(result);
-      this.submitScores(result);
       this.roundWin = 0;
 
-      if (result.guaranteed) void scene.banner.show('5 STARS!', 'This spin pays at least 5x bet', 900, '#ff5a3c');
+      if (result.payday > 0) void scene.banner.show('5 STARS!', `WANTED PAYDAY +${euro(result.payday)}`, 1100, '#ff5a3c');
       await scene.reels.spinTo(result.landed, result.stops, BASE_REELS, this.turbo, bagLabels(result.cashBags));
       if (result.driveBy) {
         void scene.banner.show('DRIVE-BY!', `${result.driveBy.length} WILD${result.driveBy.length > 1 ? 'S' : ''} SPRAYED`, 700);
@@ -327,21 +355,21 @@ export class GameController {
         this.addWin(base.totalWin);
         await scene.reels.presentWins(base);
       }
+      if (result.payday > 0) this.addWin(result.payday);
       await this.presentFeatures(result);
-      if (result.capped) await scene.banner.show('MAX WIN', `Capped at ${fmt(result.totalWin)}`, 1500);
-      scene.hud.win.setValue(result.totalWin > 0 ? fmt(result.totalWin) : '—');
+      if (result.capped) await scene.banner.show('MAX WIN', `Capped at ${euro(result.totalWin)}`, 1500);
+      scene.hud.win.setValue(result.totalWin > 0 ? euro(result.totalWin) : '—');
       if (bigWinTier(result.totalWin, result.totalBet) >= 0) {
         scene.reels.clearWins();
         await showBigWin(scene.overlay, scene.layout, result.totalWin, result.totalBet);
       }
 
-      if (result.totalWin > 0) {
-        await countUp(shownBalance, wallet.balance, Math.min(1200, 300 + result.totalWin), (v) => scene.hud.balance.setValue(fmt(v)));
-      }
-      this.refreshHud();
+      // Only now show the balance the casino confirmed for this round.
+      this.state = state;
       this.toastAchievements(unlocked);
-      if (result.totalWin > 0 && this.autoRemaining === null && this.progress.settings.gamble) this.setGambleOffer(result.totalWin);
       return result;
     });
+    this.refreshHud();
+    return played;
   }
 }

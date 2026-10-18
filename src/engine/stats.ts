@@ -6,15 +6,19 @@ export interface RtpBreakdown {
   rounds: number;
   rtp: number;
   base: number;
+  /** Wanted Level Payday prizes. */
+  payday: number;
   features: Record<FeatureKey, number>;
   hitRate: number;
+  /** Standard deviation of one round's return, in total bets (volatility). */
+  stdDev: number;
   maxWinMultiplier: number;
   /** Rounds per trigger, keyed by feature. */
   triggerEvery: Record<FeatureKey, number>;
   /** Average feature payout in total bets, keyed by feature. */
   averageAward: Record<FeatureKey, number>;
   driveByEvery: number;
-  guaranteedEvery: number;
+  paydayEvery: number;
 }
 
 const perFeature = (value: number) =>
@@ -29,8 +33,10 @@ export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdow
   let base = 0;
   let hits = 0;
   let maxWin = 0;
+  let sumSq = 0;
   let driveBys = 0;
-  let guaranteed = 0;
+  let paydays = 0;
+  let paydayWon = 0;
   const featureWin = perFeature(0);
   const featureCount = perFeature(0);
 
@@ -43,8 +49,10 @@ export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdow
     base += r.base.totalWin;
     if (r.totalWin > 0) hits++;
     maxWin = Math.max(maxWin, r.totalWin / r.totalBet);
+    sumSq += (r.totalWin / r.totalBet) ** 2;
     if (r.driveBy) driveBys++;
-    if (r.guaranteed) guaranteed++;
+    if (r.payday > 0) paydays++;
+    paydayWon += r.payday;
     for (const f of FEATURES) {
       const feature = r.features[f];
       if (feature) {
@@ -59,8 +67,10 @@ export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdow
     rounds,
     rtp: won / bet,
     base: base / bet,
+    payday: paydayWon / bet,
     features: Object.fromEntries(FEATURES.map((f) => [f, featureWin[f] / bet])) as Record<FeatureKey, number>,
     hitRate: hits / rounds,
+    stdDev: Math.sqrt(sumSq / rounds - (won / bet) ** 2),
     maxWinMultiplier: maxWin,
     triggerEvery: Object.fromEntries(
       FEATURES.map((f) => [f, featureCount[f] > 0 ? rounds / featureCount[f] : Infinity]),
@@ -69,6 +79,6 @@ export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdow
       FEATURES.map((f) => [f, featureCount[f] > 0 ? featureWin[f] / featureCount[f] / totalBet : 0]),
     ) as Record<FeatureKey, number>,
     driveByEvery: driveBys > 0 ? rounds / driveBys : Infinity,
-    guaranteedEvery: guaranteed > 0 ? rounds / guaranteed : Infinity,
+    paydayEvery: paydays > 0 ? rounds / paydays : Infinity,
   };
 }

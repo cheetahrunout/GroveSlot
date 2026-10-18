@@ -3,7 +3,7 @@ import { TURF_WAR, type WheelSlice } from '../../config/features';
 import type { TurfWarResult } from '../../engine/features/turfWar';
 import { sound } from '../../audio/sound';
 import { Button } from '../Button';
-import { fmt } from '../format';
+import { euro } from '../format';
 import type { Layout } from '../layout';
 import { COLORS, FONT_TAG, textStyle } from '../theme';
 import { easeOutBack, easeOutCubic, tween, wait } from '../tween';
@@ -126,7 +126,7 @@ export class TurfWarScene extends Container {
     const { width: W, height: H } = this.layout;
     const portrait = this.layout.mode === 'portrait';
     this.status.text = result.trigger === 'random' ? 'SURPRISE! THE BALLAS ROLLED UP' : 'TAKE THE HOOD BACK';
-    this.totalText.text = 'TOTAL 0';
+    this.totalText.text = `TOTAL ${euro(0)}`;
 
     let resolveTap: (() => void) | null = null;
     const spinButton = new Button({ width: 0, height: 0, radius: 85, label: 'SPIN', fontSize: 50, fill: COLORS.danger }, () => resolveTap?.());
@@ -153,7 +153,7 @@ export class TurfWarScene extends Container {
         total += spin.win;
         onWin(spin.win);
         sound.play('cheer');
-        this.status.text = `${TURF_WAR.territories[i]} TAKEN! +${fmt(spin.win)}`;
+        this.status.text = `${TURF_WAR.territories[i]} TAKEN! +${euro(spin.win)}`;
       } else if (spin.outcome === 'backup') {
         this.status.text = 'BACKUP! YOUR HOMIES GOT YOUR BACK';
       } else if (spin.outcome === 'blocked') {
@@ -164,17 +164,17 @@ export class TurfWarScene extends Container {
         this.status.style.fill = '#c58cf0';
       }
       this.backupText.text = spin.backups > 0 ? `BACKUP x${spin.backups}` : '';
-      this.totalText.text = `TOTAL ${fmt(total)}`;
+      this.totalText.text = `TOTAL ${euro(total)}`;
       await wait(900);
     }
     spinButton.visible = false;
 
     if (result.turfBoss) {
       this.status.style.fill = COLORS.gold;
-      this.status.text = `TURF BOSS! +${fmt(result.turfBossWin)}`;
+      this.status.text = `TURF BOSS! +${euro(result.turfBossWin)}`;
       total += result.turfBossWin;
       onWin(result.turfBossWin);
-      this.totalText.text = `TOTAL ${fmt(total)}`;
+      this.totalText.text = `TOTAL ${euro(total)}`;
       await wait(1800);
     }
     this.status.style.fill = COLORS.text;

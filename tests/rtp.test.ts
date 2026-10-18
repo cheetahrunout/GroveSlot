@@ -6,8 +6,10 @@ describe('game maths (200k simulated rounds)', () => {
   const r = simulate(200_000, 2024);
 
   it('keeps the base game near its RTP budget', () => {
-    expect(r.base).toBeGreaterThan(0.54);
-    expect(r.base).toBeLessThan(0.62);
+    expect(r.base).toBeGreaterThan(0.5);
+    expect(r.base).toBeLessThan(0.58);
+    expect(r.payday).toBeGreaterThan(0.02);
+    expect(r.payday).toBeLessThan(0.07);
   });
 
   it('keeps free spins near their RTP budget', () => {

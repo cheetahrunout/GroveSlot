@@ -68,6 +68,8 @@ export function buildStrip(counts: SymbolCounts, seed: number): SymbolId[] {
   throw new Error('Could not space special symbols; the strip has too many of them');
 }
 
+// Strip order is fixed game layout (like the stickers on a physical reel), built
+// from a constant so every build has the same reels. It decides no outcome.
 export const BASE_REELS: readonly (readonly SymbolId[])[] = BASE_REEL_COUNTS.map((counts, i) =>
   buildStrip(counts, 0x620e5 + i),
 );

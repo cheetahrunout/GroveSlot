@@ -1,9 +1,10 @@
 import { Container, Graphics, Text, Ticker } from 'pixi.js';
 import { sound } from '../audio/sound';
-import { fmt } from './format';
+import { euro } from './format';
 import type { Layout } from './layout';
 import { COLORS, FONT_TAG, textStyle } from './theme';
 import { easeOutBack, tween, wait } from './tween';
+import { fx } from './fx';
 
 /** Win tiers, as multiples of the total bet. */
 export const BIG_WIN_TIERS = [
@@ -39,7 +40,7 @@ export async function showBigWin(parent: Container, layout: Layout, win: number,
   const title = new Text({ text: '', style: textStyle(COLORS.gold, 150, { fontFamily: FONT_TAG, stroke: { color: COLORS.background, width: 14 } }) });
   title.anchor.set(0.5);
   title.position.set(W / 2, H / 2 - 110);
-  const amount = new Text({ text: '0', style: textStyle(COLORS.text, 130, { stroke: { color: COLORS.background, width: 10 } }) });
+  const amount = new Text({ text: euro(0), style: textStyle(COLORS.text, 130, { stroke: { color: COLORS.background, width: 10 } }) });
   amount.anchor.set(0.5);
   amount.position.set(W / 2, H / 2 + 80);
   root.addChild(dim, coinLayer, title, amount);
@@ -48,8 +49,8 @@ export async function showBigWin(parent: Container, layout: Layout, win: number,
   const coins: Coin[] = [];
   const spawn = () => {
     const g = new Graphics().ellipse(0, 0, 22, 22).fill(0xe0b84a).stroke({ color: 0x7a5a10, width: 4 });
-    g.position.set(W / 2 + (Math.random() - 0.5) * 300, H / 2 + 40);
-    coins.push({ g, vx: (Math.random() - 0.5) * 22, vy: -14 - Math.random() * 16, spin: Math.random() * 0.3 });
+    g.position.set(W / 2 + (fx() - 0.5) * 300, H / 2 + 40);
+    coins.push({ g, vx: (fx() - 0.5) * 22, vy: -14 - fx() * 16, spin: fx() * 0.3 });
     coinLayer.addChild(g);
   };
   const physics = (ticker: Ticker) => {
@@ -81,7 +82,7 @@ export async function showBigWin(parent: Container, layout: Layout, win: number,
   while (!skipped) {
     const t = Math.min(1, (performance.now() - start) / duration);
     const value = Math.round(win * (1 - (1 - t) ** 2));
-    amount.text = fmt(value);
+    amount.text = euro(value);
     const tier = bigWinTier(value, totalBet);
     if (tier > shownTier) {
       shownTier = tier;
@@ -95,7 +96,7 @@ export async function showBigWin(parent: Container, layout: Layout, win: number,
     if (t >= 1) break;
     await new Promise((r) => requestAnimationFrame(r));
   }
-  amount.text = fmt(win);
+  amount.text = euro(win);
   await wait(skipped ? 600 : 1500);
 
   Ticker.shared.remove(physics);

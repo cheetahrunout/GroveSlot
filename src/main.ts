@@ -2,10 +2,7 @@ import { Application } from 'pixi.js';
 import wildIcon from './assets/symbols/wild-trident-g.jpg';
 import { sound } from './audio/sound';
 import { Progress } from './economy/progress';
-import { Wallet } from './economy/wallet';
-import { createRng } from './engine/rng';
 import { GameController } from './game/GameController';
-import { LocalLeaderboard } from './leaderboard/leaderboard';
 import { loadAssets } from './view/assets';
 import { showBigWin } from './view/BigWin';
 import { GameScene } from './view/GameScene';
@@ -27,7 +24,7 @@ async function boot() {
 
   const textures = await loadAssets(app.renderer);
   const progress = new Progress();
-  const controller = new GameController(new Wallet(), createRng(), progress, new LocalLeaderboard());
+  const controller = new GameController(progress);
   const scene = new GameScene(textures, {
     spin: () => void controller.spin(),
     betDown: () => controller.changeBet(-1),
@@ -42,10 +39,10 @@ async function boot() {
   const relayout = () => scene.arrange(computeLayout(app.screen.width, app.screen.height));
   app.renderer.on('resize', relayout);
   relayout();
-  controller.attach(scene);
+  void controller.attach(scene);
 
   if (import.meta.env.DEV) {
-    // Debug hook for testing: __groveslot.controller.forceNext = 'freeSpins'
+    // Local play: __groveslot.controller.forceNext = 'freeSpins' (the server ignores it with the real casino).
     (window as unknown as Record<string, unknown>).__groveslot = {
       controller,
       app,

@@ -8,12 +8,12 @@ export interface WantedState {
 
 export const INITIAL_WANTED: WantedState = { stars: 0, lossStreak: 0 };
 
-/** True when this round must pay at least WANTED.guaranteedMultiplier × bet. */
+/** True when this round pays a Payday prize. */
 export const isGuaranteed = (w: WantedState) => w.stars >= WANTED.maxStars;
 
 /**
  * After a round: a win adds a star, every few losses in a row take one
- * away, and a guaranteed round resets the meter.
+ * away, and a payday round resets the meter.
  */
 export function nextWanted(w: WantedState, won: boolean): WantedState {
   if (isGuaranteed(w)) return INITIAL_WANTED;

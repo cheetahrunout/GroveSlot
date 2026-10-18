@@ -1,6 +1,6 @@
 import { Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
 import { JACKPOTS, type JackpotId } from '../config/features';
-import { fmtShort } from './format';
+import { euroShort } from './format';
 import type { LayoutMode } from './layout';
 import { COLORS, textStyle } from './theme';
 
@@ -8,7 +8,7 @@ const ORDER: JackpotId[] = ['homie', 'soldier', 'og', 'kingpin'];
 const BOX_W = 240;
 const BOX_H = 100;
 
-/** The four jackpot values for the current bet. */
+/** The four jackpot values for the current bet (fixed multiples of it). */
 export class JackpotBar extends Container {
   private readonly boxes = new Map<JackpotId, { box: Container; value: Text }>();
 
@@ -42,11 +42,11 @@ export class JackpotBar extends Container {
     }
   }
 
-  update(totalBet: number, kingpinPot: number): void {
+  update(totalBet: number): void {
     for (const id of ORDER) {
-      const amount = JACKPOTS[id].multiplier * totalBet + (id === 'kingpin' ? Math.floor(kingpinPot) : 0);
+      const amount = JACKPOTS[id].multiplier * totalBet;
       const { value } = this.boxes.get(id)!;
-      value.text = fmtShort(amount);
+      value.text = euroShort(amount);
       value.scale.set(1);
       value.scale.set(Math.min(1, (id === 'kingpin' ? 130 : 210) / value.width));
     }

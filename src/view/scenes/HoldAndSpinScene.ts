@@ -3,11 +3,12 @@ import { CASH_RUN, JACKPOTS } from '../../config/features';
 import { REEL_COUNT, ROW_COUNT } from '../../config/reels';
 import type { CashBag, HoldAndSpinResult } from '../../engine/features/holdAndSpin';
 import { sound } from '../../audio/sound';
-import { bagLabel, fmt } from '../format';
+import { bagLabel, euro } from '../format';
 import type { Layout } from '../layout';
 import { createCashBagView } from '../SymbolView';
 import { COLORS, FONT_TAG, textStyle } from '../theme';
 import { easeOutBack, tween, wait } from '../tween';
+import { fx } from '../fx';
 
 const CELL = 200;
 const GAP = 14;
@@ -107,7 +108,7 @@ export class HoldAndSpinScene extends Container {
       ghosts.length = 0;
       for (let reel = 0; reel < REEL_COUNT; reel++) {
         for (let row = 0; row < ROW_COUNT; row++) {
-          if (taken.has(`${reel},${row}`) || Math.random() > 0.35) continue;
+          if (taken.has(`${reel},${row}`) || fx() > 0.35) continue;
           const ghost = createCashBagView(CELL, undefined);
           ghost.alpha = 0.25;
           ghost.position.set(reel * STEP, row * STEP);
@@ -153,7 +154,7 @@ export class HoldAndSpinScene extends Container {
       cell.alpha = 0.35;
       total += bag.value;
       onCollect(bag.value);
-      this.totalText.text = fmt(total);
+      this.totalText.text = euro(total);
       await wait(bag.jackpot ? 700 : 160);
       if (bag.jackpot) this.status.text = `${JACKPOTS[bag.jackpot].name} JACKPOT!`;
     }
@@ -162,7 +163,7 @@ export class HoldAndSpinScene extends Container {
       await this.showKingpin(result.kingpinWin);
       total += result.kingpinWin;
       onCollect(result.kingpinWin);
-      this.totalText.text = fmt(total);
+      this.totalText.text = euro(total);
     }
     this.status.text = 'CASH RUN WIN';
     await wait(1600);
@@ -179,7 +180,7 @@ export class HoldAndSpinScene extends Container {
     const title = new Text({ text: 'KINGPIN!', style: textStyle(COLORS.gold, 140, { fontFamily: FONT_TAG, stroke: { color: COLORS.background, width: 12 } }) });
     title.anchor.set(0.5);
     title.y = 170;
-    const value = new Text({ text: fmt(amount), style: textStyle(COLORS.text, 90, { stroke: { color: COLORS.background, width: 8 } }) });
+    const value = new Text({ text: euro(amount), style: textStyle(COLORS.text, 90, { stroke: { color: COLORS.background, width: 8 } }) });
     value.anchor.set(0.5);
     value.y = 290;
     panel.addChild(crown, title, value);

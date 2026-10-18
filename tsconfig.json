@@ -11,7 +11,8 @@
     "noFallthroughCasesInSwitch": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "resolveJsonModule": true
   },
-  "include": ["src", "tests", "tools", "vite.config.ts", "vite.single.config.ts"]
+  "include": ["src", "server", "tests", "tools", "vite.config.ts", "vite.single.config.ts"]
 }

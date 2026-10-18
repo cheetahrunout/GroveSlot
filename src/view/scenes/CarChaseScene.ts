@@ -1,15 +1,16 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import { GAMBLE } from '../../config/features';
-import { canGamble, type Alley } from '../../engine/features/gamble';
+import type { Alley } from '../../engine/features/gamble';
 import { createLowrider } from '../art/lowrider';
 import { sound } from '../../audio/sound';
 import { Button } from '../Button';
-import { fmt } from '../format';
+import { euro } from '../format';
 import type { Layout } from '../layout';
 import { COLORS, FONT_TAG, textStyle } from '../theme';
 import { easeInOutQuad, tween, wait } from '../tween';
 
-export type GambleResolver = (pick: Alley, stake: number) => { escape: Alley; won: boolean; stake: number };
+/** Asks the game server to play one pick; it decides and the casino settles. */
+export type GambleResolver = (pick: Alley) => Promise<{ escape: Alley; won: boolean; stake: number; canContinue: boolean }>;
 
 /** Car Chase: pick the alley the cops are not watching to double the win. */
 export class CarChaseScene extends Container {
@@ -70,7 +71,7 @@ export class CarChaseScene extends Container {
   }
 
   /** Runs the gamble; returns the stake the player leaves with. */
-  async play(originalWin: number, resolve: GambleResolver): Promise<number> {
+  async play(originalWin: number, resolve: GambleResolver, maxRounds: number = GAMBLE.maxRounds): Promise<number> {
     const portrait = this.H > this.W;
     this.text('CAR CHASE', 110, COLORS.gold, portrait ? 180 : 80).style.fontFamily = FONT_TAG;
     this.text('PICK THE ALLEY THE COPS ARE NOT WATCHING', 38, COLORS.text, portrait ? 280 : 170);
@@ -104,16 +105,28 @@ export class CarChaseScene extends Container {
 
     let stake = originalWin;
     let round = 0;
-    while (canGamble(originalWin, stake, round)) {
-      stakeText.text = `STAKE ${fmt(stake)} → ${fmt(stake * 2)}`;
-      roundText.text = `ROUND ${round + 1} OF ${GAMBLE.maxRounds}`;
+    let canContinue = true;
+    while (canContinue) {
+      stakeText.text = `STAKE ${euro(stake)} → ${euro(stake * 2)}`;
+      roundText.text = `ROUND ${round + 1} OF ${maxRounds}`;
       buttons.forEach((b) => b.setEnabled(true));
       const choice = await new Promise<Alley | 'collect'>((r) => (choose = r));
       buttons.forEach((b) => b.setEnabled(false));
       if (choice === 'collect') break;
 
-      const outcome = resolve(choice, stake);
+      let outcome;
+      try {
+        outcome = await resolve(choice);
+      } catch (e) {
+        // Refused or voided: the stake was never lost.
+        resultText.style.fill = COLORS.text;
+        resultText.text = '';
+        roundText.text = (e as Error).message;
+        await wait(2000);
+        break;
+      }
       round++;
+      canContinue = outcome.canContinue;
       const target = this.alleyX[choice === 'left' ? 0 : 1];
       car.scale.x = choice === 'left' ? -0.8 : 0.8;
       sound.play('skid');
@@ -148,8 +161,8 @@ export class CarChaseScene extends Container {
     }
 
     if (stake > 0) {
-      stakeText.text = `COLLECTED ${fmt(stake)}`;
-      if (!canGamble(originalWin, stake, round) && round > 0) roundText.text = 'MAX CHASE REACHED';
+      stakeText.text = `COLLECTED ${euro(stake)}`;
+      if (!canContinue && round > 0) roundText.text = 'MAX CHASE REACHED';
       await wait(1000);
     }
     return stake;

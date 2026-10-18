@@ -20,6 +20,15 @@ The game is called **Lowrider** (the project and repository stay GroveSlot). A b
 
 ---
 
+## Grove Casino integration (current architecture)
+
+Lowrider now runs as a Grove Casino game under the casino's contract (GAMES.md). That replaced parts of the original plan below:
+- **The server decides everything.** `server/` is a Node game server that runs the engine with `crypto.randomInt`. The page is a thin client that sends intentions and plays back confirmed results.
+- **The casino holds the money.** The wallet, daily allowance, broke rescue and Kingpin pot were removed. Each spin and each Car Chase pick is a casino round (open → decide → settle, void on failure). Bets are euro cents within the casino's limits.
+- **No rerolls.** The Wanted Level's "guaranteed win" (which re-spun until it won) became a Payday prize drawn from a table.
+- **Control states, heartbeat, health, scores.** The casino's leaderboard replaces the local one.
+- Manifest `casino-game.json` (RTP 96.00%), Dockerfile and a GHCR image workflow. GitHub Pages hosting was dropped, because the page needs the server.
+
 ## 2. Tech stack
 
 | Concern | Choice | Why |
@@ -121,23 +130,17 @@ The game is called **Lowrider** (the project and repository stay GroveSlot). A b
 
 ---
 
-## 5. Token economy (no real money)
+## 5. Money and progress
 
-- New player: **10,000 tokens**.
-- **Daily allowance:** +2,000 tokens every 24 h, offered in a pop-up when you open the game.
-- **Broke rescue:** if your balance is below the minimum bet, a "Back on your feet" button gives +1,000 (with a cooldown of 1 per hour).
-- Tokens can't be bought, transferred or redeemed. A "No real money, for fun only" notice sits on the title screen and in settings.
+- **Grove Casino holds every balance.** Players bring their casino balance; each spin and Car Chase pick is a casino round in euro cents (€0.20–€5.00 by default, set by the casino's limits). The game keeps no balances. (The earlier free-token wallet, daily allowance and rescue were removed for the casino.)
+- The page says "For fun only. No real money is played here."
 - Cosmetics unlocked by **achievements** (not purchases): reel skins Night Shift (Tagger), Sunset Cruise (Hydraulics King) and Rainy Block (Turf Boss).
-
-### Leaderboard (prepared, local first)
-- `LeaderboardService` interface with `submit()` / `top()`; categories: biggest win, biggest multiplier, territories taken.
-- `LocalLeaderboard` stores the top 50 per category in localStorage. An online version (for example a small serverless API) can implement the same interface later without UI changes.
-- The leaderboard screen itself comes with the economy polish milestone.
+- **Leaderboards** are the casino's: wins of 10× the bet and up are sent with `score()`.
 
 ### Stats and achievements
-- Tracked: spins, tokens bet and won, biggest win, each bonus, territories, Kingpins, Wanted paydays, Drive-Bys, best Car Chase streak and time played (MENU → STATS).
+- Tracked: spins, total bet and won, biggest win, each bonus, territories, Kingpins, Wanted paydays, Drive-Bys, best Car Chase streak and time played (MENU → STATS).
 - 11 achievements (MENU → TROPHIES): All We Had To Do… (first bonus), Tagger, Hydraulics King, Bag Man, Kingpin, Turf Boss, Most Wanted, Drive-By, Escape Artist, Respect (50× win) and Respect + (1,000 spins). New ones pop up as a toast.
-- MENU also has the paytable at your bet (PAYS), the local leaderboard (LEADERS) and SETTINGS: gamble offer, sound, music, player name and reel skin.
+- MENU also has the paytable at your bet (PAYS) and SETTINGS: gamble button, sound, music and reel skin. Stats and trophies are kept in the browser, for show only.
 
 ---
 

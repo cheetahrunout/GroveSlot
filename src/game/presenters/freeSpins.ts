@@ -4,7 +4,8 @@ import type { FreeSpinsResult } from '../../engine/features/freeSpins';
 import { sound } from '../../audio/sound';
 import { TRANSITION_COLORS, playTransition } from '../../view/Transition';
 import { wait } from '../../view/tween';
-import { fmt, type PresentContext } from './context';
+import { euro } from '../../view/format';
+import type { PresentContext } from './context';
 
 export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult): Promise<void> {
   const { scene } = ctx;
@@ -65,7 +66,7 @@ export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult)
   await playTransition(scene.overlay, scene.layout, {
     colors: TRANSITION_COLORS.freeSpins,
     title: 'FREE SPINS WIN',
-    sub: fmt(fs.totalWin),
+    sub: euro(fs.totalWin),
     hold: 1300,
     onCovered: () => {
       scene.setMode('base');

@@ -5,3 +5,4 @@ dist/
 dist-single/
 # One-file copy handed out for self-hosting; rebuild with npm run build:single
 /lowrider.html
+dist-server/

@@ -5,6 +5,7 @@ import { FreeSpinsBar } from './FreeSpinsBar';
 import { JackpotBar } from './JackpotBar';
 import { WantedMeter } from './WantedMeter';
 import { Toasts } from './Toast';
+import { StatusOverlay } from './StatusOverlay';
 import { SKINS, type SkinId } from '../economy/achievements';
 import { HUD, type HudHandlers } from './HUD';
 import type { Layout } from './layout';
@@ -20,6 +21,8 @@ export class GameScene extends Container {
   readonly jackpots: JackpotBar;
   readonly wanted = new WantedMeter();
   readonly toasts = new Toasts();
+  /** The casino's control state and session messages, above everything. */
+  readonly status = new StatusOverlay();
   private skin: SkinId = 'classic';
   private mode: 'base' | 'freeSpins' = 'base';
   /** Full-screen layer for bonus games, above the reels and HUD. */
@@ -40,12 +43,12 @@ export class GameScene extends Container {
     });
     this.title.anchor.set(0.5, 0);
     this.disclaimer = new Text({
-      text: 'For fun only. Tokens have no real-money value and cannot be bought or cashed out.',
+      text: 'For fun only. No real money is played here.',
       style: textStyle(COLORS.muted, 24, { fontFamily: 'sans-serif', letterSpacing: 0 }),
     });
     this.disclaimer.anchor.set(0.5, 1);
     this.freeSpinsBar.visible = false;
-    this.addChild(this.backdrop, this.title, this.jackpots, this.wanted, this.freeSpinsBar, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner, this.toasts);
+    this.addChild(this.backdrop, this.title, this.jackpots, this.wanted, this.freeSpinsBar, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner, this.status, this.toasts);
   }
 
   setMode(mode: 'base' | 'freeSpins'): void {
@@ -81,6 +84,7 @@ export class GameScene extends Container {
     this.banner.position.set(W / 2, H / 2 - 60);
     this.jackpots.arrange(layout.mode, W);
     this.toasts.areaWidth = W;
+    this.status.arrange(layout);
 
     if (layout.mode === 'landscape') {
       const spinColumn = 280;

@@ -22,7 +22,7 @@ export interface HoldAndSpinResult {
   bags: CashBag[];
   /** All 15 cells filled: the Kingpin jackpot. */
   grand: boolean;
-  /** Kingpin payout when `grand` is true (1,000× bet plus the pot). */
+  /** Kingpin payout when `grand` is true (1,000× bet). */
   kingpinWin: number;
   totalWin: number;
 }
@@ -40,7 +40,6 @@ export function playHoldAndSpin(
   rng: Rng,
   initialBags: readonly CashBag[],
   totalBet: number,
-  kingpinPot: number,
 ): HoldAndSpinResult {
   const cells = REEL_COUNT * ROW_COUNT;
   const taken = new Set(initialBags.map((b) => `${b.reel},${b.row}`));
@@ -64,7 +63,7 @@ export function playHoldAndSpin(
   }
 
   const grand = bags.length === cells;
-  const kingpinWin = grand ? JACKPOTS.kingpin.multiplier * totalBet + kingpinPot : 0;
+  const kingpinWin = grand ? JACKPOTS.kingpin.multiplier * totalBet : 0;
   const totalWin = bags.reduce((sum, b) => sum + b.value, 0) + kingpinWin;
   return { initialBags: [...initialBags], respins, bags, grand, kingpinWin, totalWin };
 }

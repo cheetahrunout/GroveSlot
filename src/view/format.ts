@@ -1,17 +1,30 @@
 import { JACKPOTS } from '../config/features';
 import type { CashBag } from '../engine/features/holdAndSpin';
 
+/** Counts: 1,234. */
 export const fmt = (n: number) => n.toLocaleString('en-US');
 
-/** Short token amounts for small spaces: 950, 12.5K, 3.2M. */
-export function fmtShort(n: number): string {
-  if (n >= 1_000_000) return `${+(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 10_000) return `${+(n / 1000).toFixed(1)}K`;
-  return fmt(n);
+/** Euro cents as euros: €0.40, €1,250.00. */
+export function euro(cents: number): string {
+  return `€${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Euro cents for small spaces: €0.40, €12, €1.2K. */
+export function euroShort(cents: number): string {
+  const e = cents / 100;
+  if (e >= 1_000_000) return `€${+(e / 1_000_000).toFixed(1)}M`;
+  if (e >= 1000) return `€${+(e / 1000).toFixed(1)}K`;
+  return Number.isInteger(e) ? `€${e}` : euro(cents);
+}
+
+/** A balance as the casino reports it (euro cents or casino tokens). */
+export function money(balance: { value: number; unit: 'cents' | 'tokens' } | null): string {
+  if (!balance) return '—';
+  return balance.unit === 'cents' ? euro(balance.value) : `${fmt(balance.value)} TOKENS`;
 }
 
 export function bagLabel(bag: CashBag): string {
-  return bag.jackpot ? JACKPOTS[bag.jackpot].name : fmtShort(bag.value);
+  return bag.jackpot ? JACKPOTS[bag.jackpot].name : euroShort(bag.value);
 }
 
 /** "reel,row" → label, for showing bag values on the reels. */

@@ -82,16 +82,22 @@ describe('Wanted Level', () => {
     expect(nextWanted({ stars: 0, lossStreak: WANTED.lossesPerStar - 1 }, false).stars).toBe(0);
   });
 
-  it('pays at least 5× the bet from line wins on the guaranteed spin', () => {
+  it('pays a Payday prize from the table at five stars, without re-spinning', () => {
     const rng = createRng(3);
     const state = { ...INITIAL_STATE, wanted: { stars: WANTED.maxStars, lossStreak: 0 } };
-    for (let i = 0; i < 50; i++) {
+    const allowed = new Set<number>(WANTED.payday.map((p) => p.multiplier));
+    for (let i = 0; i < 200; i++) {
       const { result, state: next } = playRound(rng, state, 2);
-      expect(result.guaranteed).toBe(true);
-      expect(result.base.totalWin).toBeGreaterThanOrEqual(WANTED.guaranteedMultiplier * result.totalBet);
-      expect(Object.keys(result.features)).toEqual([]);
+      expect(allowed.has(result.payday / result.totalBet)).toBe(true);
+      expect(result.totalWin).toBeGreaterThanOrEqual(result.payday);
       expect(next.wanted).toEqual(INITIAL_WANTED);
     }
+  });
+
+  it('pays no Payday below five stars', () => {
+    const rng = createRng(4);
+    const state = { ...INITIAL_STATE, wanted: { stars: WANTED.maxStars - 1, lossStreak: 0 } };
+    for (let i = 0; i < 200; i++) expect(playRound(rng, state, 1).result.payday).toBe(0);
   });
 });
 

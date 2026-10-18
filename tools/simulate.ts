@@ -16,6 +16,7 @@ const budget = (key: string) => {
 console.log(`GroveSlot simulation: ${rounds.toLocaleString('en-US')} rounds, seed ${seed}`);
 console.log(`  Total RTP      ${pct(r.rtp)}`);
 console.log(`  Base game      ${pct(r.base)}${budget('base')}`);
+console.log(`  Wanted payday  ${pct(r.payday)}${budget('wantedPayday')}  1 in ${Math.round(r.paydayEvery)}`);
 for (const f of FEATURES) {
   const every = Math.round(r.triggerEvery[f]).toLocaleString('en-US');
   console.log(
@@ -23,7 +24,10 @@ for (const f of FEATURES) {
   );
 }
 console.log(`  Drive-By       1 in ${Math.round(r.driveByEvery)}`);
-console.log(`  Wanted payday  1 in ${Math.round(r.guaranteedEvery)}`);
 console.log(`  Hit rate       ${pct(r.hitRate)}`);
+console.log(`  Volatility     σ = ${r.stdDev.toFixed(1)}× bet per round`);
+for (const n of [500, 100_000]) {
+  console.log(`  RTP spread     ±${((2 * r.stdDev) / Math.sqrt(n) * 100).toFixed(1)} points over ${n.toLocaleString('en-US')} rounds (95% of the time)`);
+}
 console.log(`  Biggest win    ${r.maxWinMultiplier.toFixed(1)}× bet`);
 console.log(`  (${((Date.now() - started) / 1000).toFixed(1)} s)`);

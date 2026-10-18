@@ -4,6 +4,7 @@ import type { LowriderHopResult } from '../../engine/features/lowriderHop';
 import { createLowrider } from '../art/lowrider';
 import { sound } from '../../audio/sound';
 import { Button } from '../Button';
+import { euro } from '../format';
 import type { Layout } from '../layout';
 import { COLORS, FONT_TAG, textStyle } from '../theme';
 import { easeInOutQuad, easeOutBack, easeOutCubic, tween, wait } from '../tween';
@@ -13,7 +14,6 @@ const PAINT_NAMES = ['GREEN SABRE', 'GOLD RUSH', 'WHITE WALLS'];
 /** Pixels the body rises for each step up the hop table. */
 const HOP_STEP = 52;
 
-const fmt = (n: number) => n.toLocaleString('en-US');
 
 /**
  * Lowrider Hop playback. The outcome is already decided; picking a car and
@@ -139,7 +139,7 @@ export class LowriderHopScene extends Container {
     }
     this.addChild(meter);
 
-    const totalText = new Text({ text: 'TOTAL 0', style: textStyle(COLORS.gold, 56, { stroke: { color: COLORS.background, width: 6 } }) });
+    const totalText = new Text({ text: `TOTAL ${euro(0)}`, style: textStyle(COLORS.gold, 56, { stroke: { color: COLORS.background, width: 6 } }) });
     totalText.anchor.set(0.5);
     totalText.position.set(this.W / 2, this.H - 60);
     const hopsText = new Text({ text: '', style: textStyle(COLORS.text, 40, { stroke: { color: COLORS.background, width: 5 } }) });
@@ -170,13 +170,13 @@ export class LowriderHopScene extends Container {
       await tween(body, { y: 18 }, 140, easeInOutQuad); // squat
       await tween(body, { y: -height }, 260 + hop.level * 40, easeOutCubic);
       rungs[hop.level](true);
-      const pop = new Text({ text: `+${fmt(hop.win)}`, style: textStyle(COLORS.gold, 72, { stroke: { color: COLORS.background, width: 8 } }) });
+      const pop = new Text({ text: `+${euro(hop.win)}`, style: textStyle(COLORS.gold, 72, { stroke: { color: COLORS.background, width: 8 } }) });
       pop.anchor.set(0.5);
       // Above the car, but never over the hop counter.
       pop.position.set(car.x, Math.max(hopsText.y + 90, car.y - 300 - height));
       this.addChild(pop);
       total += hop.win;
-      totalText.text = `TOTAL ${fmt(total)}`;
+      totalText.text = `TOTAL ${euro(total)}`;
       onHop(hop.win);
       await tween(body, { y: 0 }, 360, easeOutBack);
       await wait(350);
@@ -187,7 +187,7 @@ export class LowriderHopScene extends Container {
     hopButton.visible = false;
     hopsText.text = '';
     heading.destroy({ children: true });
-    this.heading('HOP WIN', fmt(result.totalWin));
+    this.heading('HOP WIN', euro(result.totalWin));
     await wait(1600);
   }
 }

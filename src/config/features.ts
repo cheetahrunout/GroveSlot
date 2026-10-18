@@ -41,9 +41,6 @@ export const JACKPOTS: Record<JackpotId, { name: string; multiplier: number }> =
   kingpin: { name: 'KINGPIN', multiplier: 1000 },
 };
 
-/** Share of every bet that grows the Kingpin pot, paid on top of 1,000× bet. */
-export const KINGPIN_POT_RATE = 0.005;
-
 export const CASH_RUN = {
   /** Respins given at the start and after every new Cash Bag. */
   respins: 3,
@@ -106,8 +103,18 @@ export const WANTED = {
   maxStars: 5,
   /** Losing spins in a row that cost a star. */
   lossesPerStar: 2,
-  /** At max stars the next spin wins at least this × bet. */
-  guaranteedMultiplier: 5,
+  /**
+   * At max stars the next spin also pays a Payday prize drawn from this
+   * table (× total bet), on top of whatever the spin wins. Drawn, never
+   * re-spun. Mean ≈ 8.4× bet.
+   */
+  payday: [
+    { multiplier: 5, weight: 40 },
+    { multiplier: 8, weight: 30 },
+    { multiplier: 10, weight: 18 },
+    { multiplier: 15, weight: 8 },
+    { multiplier: 25, weight: 4 },
+  ],
 } as const;
 
 export const GAMBLE = {
@@ -121,8 +128,9 @@ export const GAMBLE = {
  * test checks the measured values against these.
  */
 export const RTP_BUDGET = {
-  /** Includes Drive-By wilds and Wanted Level guaranteed wins. */
-  base: 0.58,
+  /** Line and scatter pays, including Drive-By wilds. */
+  base: 0.54,
+  wantedPayday: 0.04,
   freeSpins: 0.2,
   lowriderHop: 0.07,
   holdAndSpin: 0.07,

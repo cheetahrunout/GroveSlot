@@ -11,7 +11,7 @@ describe('playHoldAndSpin', () => {
   it('gives 3 respins and resets them whenever a bag lands', () => {
     const rng = createRng(4);
     for (let run = 0; run < 500; run++) {
-      const r = playHoldAndSpin(rng, bagsAt([[0, 0], [0, 1], [1, 0], [2, 2], [3, 1], [4, 0]]), 20, 0);
+      const r = playHoldAndSpin(rng, bagsAt([[0, 0], [0, 1], [1, 0], [2, 2], [3, 1], [4, 0]]), 20);
       let left: number = CASH_RUN.respins;
       for (const spin of r.respins) {
         left = spin.newBags.length > 0 ? CASH_RUN.respins : left - 1;
@@ -24,14 +24,14 @@ describe('playHoldAndSpin', () => {
     }
   });
 
-  it('pays the Kingpin with its pot when all 15 cells fill', () => {
+  it('pays the Kingpin (1,000× bet) when all 15 cells fill', () => {
     // An Rng that always lands a 1× bag.
     const always: Rng = { next: () => 0, int: () => 0, weighted: () => 0 };
     const start = bagsAt([[0, 0], [1, 1], [2, 2], [3, 0], [4, 1], [4, 2]]);
-    const r = playHoldAndSpin(always, start, 20, 345);
+    const r = playHoldAndSpin(always, start, 20);
     expect(r.grand).toBe(true);
     expect(r.bags).toHaveLength(15);
-    expect(r.kingpinWin).toBe(JACKPOTS.kingpin.multiplier * 20 + 345);
+    expect(r.kingpinWin).toBe(JACKPOTS.kingpin.multiplier * 20);
   });
 
   it('values bags on the total bet, including jackpots', () => {
@@ -53,16 +53,15 @@ describe('playHoldAndSpin', () => {
 
 describe('playRound with Cash Run', () => {
   it('values every Cash Bag on screen and starts the feature from them', () => {
-    const { result, state } = playRound(createRng(9), INITIAL_STATE, 1, { force: 'holdAndSpin' });
+    const { result } = playRound(createRng(9), INITIAL_STATE, 1, { force: 'holdAndSpin' });
     expect(result.cashBags.length).toBeGreaterThanOrEqual(6);
     expect(result.features.holdAndSpin!.initialBags).toEqual(result.cashBags);
-    expect(state.kingpinPot).toBeGreaterThan(0);
   });
 
-  it('grows the Kingpin pot by 0.5% of each bet', () => {
-    const rng = createRng(1);
-    let state = INITIAL_STATE;
-    for (let i = 0; i < 100; i++) state = playRound(rng, state, 5).state;
-    expect(state.kingpinPot).toBeCloseTo(100 * 100 * 0.005, 6);
+  it('caps the round at the casino max win', () => {
+    const { result } = playRound(createRng(9), INITIAL_STATE, 1, { force: 'holdAndSpin', maxWin: 30 });
+    expect(result.totalWin).toBeLessThanOrEqual(30);
+    expect(result.capped).toBe(true);
   });
+
 });

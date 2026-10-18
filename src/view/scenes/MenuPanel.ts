@@ -5,36 +5,28 @@ import { CASH_TRIGGER_COUNT, LINE_PAYS, SCATTER_PAYS } from '../../config/paytab
 import type { SymbolId } from '../../config/symbols';
 import { ACHIEVEMENTS, SKINS, type SkinId } from '../../economy/achievements';
 import type { Progress, Settings } from '../../economy/progress';
-import type { LeaderboardCategory, LeaderboardEntry, LeaderboardService } from '../../leaderboard/leaderboard';
 import { Button } from '../Button';
-import { fmt } from '../format';
+import { euro, fmt } from '../format';
 import type { Layout } from '../layout';
 import { symbolLabel } from '../SymbolView';
 import { COLORS, textStyle } from '../theme';
 
-type Tab = 'pays' | 'stats' | 'trophies' | 'leaders' | 'settings';
+type Tab = 'pays' | 'stats' | 'trophies' | 'settings';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'pays', label: 'PAYS' },
   { id: 'stats', label: 'STATS' },
   { id: 'trophies', label: 'TROPHIES' },
-  { id: 'leaders', label: 'LEADERS' },
   { id: 'settings', label: 'SETTINGS' },
 ];
 
 export interface MenuDeps {
   progress: Progress;
-  leaderboard: LeaderboardService;
-  lineBet: number;
+  /** Current bet per line, in euro cents. */
+  lineBetCents: number;
   onSettings(patch: Partial<Settings>): void;
 }
 
-const LEADER_BOARDS: { id: LeaderboardCategory; title: string; format: (n: number) => string }[] = [
-  { id: 'biggestWin', title: 'BIGGEST WIN', format: fmt },
-  { id: 'biggestMultiplier', title: 'BIGGEST WIN (x BET)', format: (n) => `x${n}` },
-  { id: 'territoriesTaken', title: 'TERRITORIES', format: (n) => String(n) },
-];
-
-/** Paytable, stats, trophies, leaderboard and settings in one modal. */
+/** Paytable, stats, trophies and settings in one modal. The casino lobby keeps the leaderboards. */
 export class MenuPanel extends Container {
   private readonly content = new Container();
   private readonly tabButtons = new Map<Tab, Button>();
@@ -56,7 +48,7 @@ export class MenuPanel extends Container {
     panel.position.set((W - this.panelW) / 2, (H - this.panelH) / 2);
     panel.addChild(new Graphics().roundRect(0, 0, this.panelW, this.panelH, 30).fill('#0f1f10').stroke({ color: COLORS.gold, width: 6 }));
 
-    const tabW = Math.min(250, (this.panelW - 160 - 4 * 12) / 5);
+    const tabW = Math.min(280, (this.panelW - 160 - 3 * 12) / 4);
     TABS.forEach((tab, i) => {
       const b = new Button({ width: tabW, height: 76, label: tab.label, fontSize: 30, fill: COLORS.panel }, () => this.open(tab.id));
       b.setText(tab.label);
@@ -95,14 +87,13 @@ export class MenuPanel extends Container {
     if (tab === 'pays') this.renderPays();
     if (tab === 'stats') this.renderStats();
     if (tab === 'trophies') this.renderTrophies();
-    if (tab === 'leaders') void this.renderLeaders();
     if (tab === 'settings') this.renderSettings();
   }
 
   private renderPays(): void {
-    const bet = this.deps.lineBet;
+    const bet = this.deps.lineBetCents;
     const totalBet = bet * PAYLINES.length;
-    this.write(`Line pays at your bet (${fmt(bet)} per line, ${PAYLINES.length} lines, left to right)`, 0, 0, COLORS.muted, 28);
+    this.write(`Line pays at your bet of ${euro(totalBet)} (${euro(bet)} per line, ${PAYLINES.length} lines, left to right)`, 0, 0, COLORS.muted, 28);
     const symbols = Object.keys(LINE_PAYS) as SymbolId[];
     const cols = this.portrait ? 2 : 3;
     const colW = (this.panelW - 80) / cols;
@@ -111,16 +102,17 @@ export class MenuPanel extends Container {
       const x = (i % cols) * colW;
       const y = 50 + Math.floor(i / cols) * 54;
       this.write(sym === 'WILD' ? 'TRIDENT G (WILD)' : symbolLabel(sym), x, y, sym === 'WILD' ? COLORS.gold : COLORS.text, 30);
-      this.write(`${fmt(p[3] * bet)} · ${fmt(p[4] * bet)} · ${fmt(p[5] * bet)}`, x + colW - 30, y, COLORS.gold, 30, 1);
+      this.write(`${euro(p[3] * bet)} · ${euro(p[4] * bet)} · ${euro(p[5] * bet)}`, x + colW - 30, y, COLORS.gold, 30, 1);
     });
     const y = 50 + Math.ceil(symbols.length / cols) * 54 + 20;
     const lines = [
-      `SPRAY CAN anywhere: 3 / 4 / 5 pay ${[3, 4, 5].map((n) => fmt(SCATTER_PAYS[n] * totalBet)).join(' / ')} and start 10 / 15 / 20 FREE SPINS`,
+      `SPRAY CAN anywhere: 3 / 4 / 5 pay ${[3, 4, 5].map((n) => euro(SCATTER_PAYS[n] * totalBet)).join(' / ')} and start 10 / 15 / 20 FREE SPINS`,
       'LOWRIDER on reels 1, 3 and 5: LOWRIDER HOP · PALM G on reels 2, 3 and 4: TURF WAR',
       `${CASH_TRIGGER_COUNT}+ CASH BAGS: CASH RUN · Jackpots: ${(['homie', 'soldier', 'og', 'kingpin'] as const)
         .map((j) => `${JACKPOTS[j].name} ${JACKPOTS[j].multiplier}x`)
-        .join(', ')} (+ pot)`,
+        .join(', ')} your bet`,
       'The Trident G stands in for every symbol except Spray Can, Lowrider, Palm G and Cash Bag.',
+      'Five Wanted stars: the next spin also pays a Payday of 5x to 25x your bet. Return to player: 96%.',
     ];
     let lineY = y;
     for (const l of lines) {
@@ -136,9 +128,9 @@ export class MenuPanel extends Container {
     const minutes = Math.round(s.playTimeMs / 60000);
     const rows: [string, string][] = [
       ['Spins played', fmt(s.spins)],
-      ['Tokens bet', fmt(s.totalBet)],
-      ['Tokens won', fmt(s.totalWon)],
-      ['Biggest win', `${fmt(s.biggestWin)} (x${Math.round(s.biggestMultiplier * 10) / 10})`],
+      ['Total bet', euro(s.totalBet)],
+      ['Total won', euro(s.totalWon)],
+      ['Biggest win', `${euro(s.biggestWin)} (x${Math.round(s.biggestMultiplier * 10) / 10})`],
       ['Free Spins', fmt(s.featureCounts.freeSpins)],
       ['Lowrider Hops', fmt(s.featureCounts.lowriderHop)],
       ['Cash Runs', fmt(s.featureCounts.holdAndSpin)],
@@ -177,31 +169,11 @@ export class MenuPanel extends Container {
     });
   }
 
-  private async renderLeaders(): Promise<void> {
-    const boards = await Promise.all(LEADER_BOARDS.map((b) => this.deps.leaderboard.top(b.id, 10)));
-    if (this.destroyed) return;
-    const cols = this.portrait ? 1 : 3;
-    const colW = (this.panelW - 80) / cols;
-    LEADER_BOARDS.forEach((board, i) => {
-      const x = (i % cols) * colW;
-      const y0 = this.portrait ? i * 420 : 0;
-      this.write(board.title, x, y0, COLORS.gold, 36);
-      const entries: LeaderboardEntry[] = boards[i];
-      if (entries.length === 0) this.write('No scores yet', x, y0 + 60, COLORS.muted, 28);
-      entries.slice(0, this.portrait ? 5 : 10).forEach((e, k) => {
-        const y = y0 + 60 + k * 62;
-        this.write(`${k + 1}. ${e.name}`, x, y, COLORS.text, 30);
-        this.write(board.format(e.score), x + colW - 50, y, COLORS.gold, 30, 1);
-      });
-    });
-    this.write('Saved on this device. Online leaderboards can plug in later.', 0, this.panelH - 210, COLORS.muted, 24);
-  }
-
   private renderSettings(): void {
     const { progress, onSettings } = this.deps;
     const s = progress.settings;
     const toggles: { key: 'gamble' | 'sound' | 'music'; label: string }[] = [
-      { key: 'gamble', label: 'Offer the Car Chase gamble after wins' },
+      { key: 'gamble', label: 'Show the Car Chase gamble after wins' },
       { key: 'sound', label: 'Sound effects' },
       { key: 'music', label: 'Music' },
     ];
@@ -217,16 +189,7 @@ export class MenuPanel extends Container {
       this.content.addChild(b);
     });
 
-    const y = 330;
-    this.write(`Player name: ${s.name}`, 0, y + 20, COLORS.text, 34);
-    const rename = new Button({ width: 240, height: 76, label: 'CHANGE', fontSize: 32 }, () => {
-      const name = window.prompt('Name for the leaderboard (max 12 characters)', s.name);
-      if (name && name.trim()) onSettings({ name: name.trim().slice(0, 12).toUpperCase() });
-      this.open('settings');
-    });
-    rename.position.set(this.panelW - 360, y);
-    this.content.addChild(rename);
-
+    const y = 230;
     this.write('Reel skin (unlock more with trophies)', 0, y + 130, COLORS.muted, 30);
     const skins = Object.keys(SKINS) as SkinId[];
     const bw = Math.min(330, (this.panelW - 80 - 3 * 16) / 4);
@@ -244,6 +207,6 @@ export class MenuPanel extends Container {
       b.position.set(px, py);
       this.content.addChild(b);
     });
-    this.write('Tokens are for fun only: they cannot be bought, sold or cashed out.', 0, this.panelH - 210, COLORS.muted, 24);
+    this.write('Stats and trophies are kept in this browser. Your balance is kept by Grove Casino.', 0, this.panelH - 210, COLORS.muted, 24);
   }
 }

@@ -1,3 +1,5 @@
+import { fx } from '../view/fx';
+
 /**
  * All sound is synthesised with the Web Audio API: no audio files, nothing
  * borrowed. Browsers only allow audio after a tap or key press, so call
@@ -55,7 +57,7 @@ export class Sound {
       const len = this.ctx.sampleRate;
       this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
       const data = this.noise.getChannelData(0);
-      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+      for (let i = 0; i < len; i++) data[i] = fx() * 2 - 1;
     }
     void this.ctx.resume();
     if (this.musicOn) this.startMusic();
@@ -99,7 +101,7 @@ export class Sound {
     g.gain.setValueAtTime(gain, start);
     g.gain.exponentialRampToValueAtTime(0.0001, start + dur);
     src.connect(f).connect(g).connect(out);
-    src.start(start, Math.random() * 0.5);
+    src.start(start, fx() * 0.5);
     src.stop(start + dur + 0.05);
   }
 

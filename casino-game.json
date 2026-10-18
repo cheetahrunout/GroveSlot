@@ -1,0 +1,17 @@
+{
+  "slug": "lowrider",
+  "name": "Lowrider",
+  "version": "1.0.0",
+  "url": "https://lowrider.grovestreet.zip",
+  "blurb": "Grove Street slot: free spins, Lowrider Hop, Cash Run, Turf War and the Car Chase.",
+  "icon": "🚗",
+  "rtp_bps": 9600,
+  "min_bet_cents": 20,
+  "max_bet_cents": 500,
+  "max_win_cents": 2500000,
+  "multiplayer": false,
+  "settings_schema": [
+    { "key": "gamble_enabled", "type": "boolean", "label": "Offer the Car Chase double-or-nothing after wins", "default": true }
+  ],
+  "health_url": "/health"
+}

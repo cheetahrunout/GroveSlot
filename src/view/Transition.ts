@@ -4,6 +4,7 @@ import { createLowrider } from './art/lowrider';
 import type { Layout } from './layout';
 import { COLORS, FONT_TAG, textStyle } from './theme';
 import { easeInOutQuad, easeOutBack, linear, tween, wait } from './tween';
+import { fx } from './fx';
 
 export interface TransitionOptions {
   /** Paint colours for the stripes, used in turn. */
@@ -108,9 +109,9 @@ export async function playTransition(parent: Container, layout: Layout, opts: Tr
     }
     const mist = new Graphics();
     for (let i = 0; i < 70; i++) {
-      const a = Math.random() * Math.PI * 2;
-      const r = 120 + Math.random() * Math.min(W * 0.4, 520);
-      mist.circle(Math.cos(a) * r, Math.sin(a) * r * 0.45, 3 + Math.random() * 7).fill({ color: COLORS.gold, alpha: 0.5 });
+      const a = fx() * Math.PI * 2;
+      const r = 120 + fx() * Math.min(W * 0.4, 520);
+      mist.circle(Math.cos(a) * r, Math.sin(a) * r * 0.45, 3 + fx() * 7).fill({ color: COLORS.gold, alpha: 0.5 });
     }
     title.addChildAt(mist, 0);
     title.position.set(W / 2, H / 2 - 40);
