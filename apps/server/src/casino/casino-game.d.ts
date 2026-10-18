@@ -4,7 +4,7 @@
 // Field names on the wire are the casino's (snake_case); the SDK's call arguments are camelCase.
 
 /** the casino's four states, plus 'offline': what watch() sets when the casino has not answered a heartbeat for 90 s (refuse new rounds) */
-export type GameStatus = 'live' | 'last_bets' | 'halted' | 'maintenance' | 'offline';
+export type GameStatus = 'open' | 'demo' | 'maintenance' | 'closed' | 'offline';
 export type RoundStatus = 'open' | 'settled' | 'void';
 export type TableStatus = 'open' | 'full' | 'playing' | 'closed';
 export type Meta = Record<string, unknown>;
@@ -15,6 +15,8 @@ export interface Limits { min_bet_cents: number; max_bet_cents: number; max_win_
 /** what /api/game/control, every heartbeat answer and every 'control' event carry */
 export interface Control {
   status: GameStatus;
+  /** true in the demo state: play exactly as open and show a DEMO mark; the casino returns every round when it ends */
+  demo: boolean;
   status_reason: string | null;
   /** what the manifest declared the game bets and shows in */
   currency: 'euro' | 'tokens';
@@ -98,6 +100,7 @@ export interface Heartbeat { version?: string; players?: number; tables?: TableR
 /** the object watch() keeps current; read status, settings and limits from it before every round */
 export interface WatchState {
   status: GameStatus;
+  demo?: boolean;
   settings: Meta;
   limits: Limits | null;
   rtp_bps?: number;

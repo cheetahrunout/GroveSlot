@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import fastifyCookie from '@fastify/cookie';
 import fastifyRateLimit from '@fastify/rate-limit';
@@ -85,7 +85,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const casinoOrigin = casinoUrl ? new URL(casinoUrl).origin : '';
   const csp = [
     "default-src 'self'",
-    "script-src 'self'",
+    `script-src 'self' ${casinoOrigin}`.trim(),
     `style-src 'self' 'unsafe-inline' ${casinoOrigin} https://fonts.googleapis.com`.trim(),
     "font-src 'self' data: https://fonts.gstatic.com",
     "img-src 'self' data: blob:",
@@ -175,7 +175,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     const res = reply.raw;
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
     const send = (type: string, data: unknown) => res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
-    const pushControl = (c: { status: ControlEvent['status']; reason: string }) => send('control', { status: c.status, reason: c.reason } satisfies ControlEvent);
+    const pushControl = (c: ControlEvent) => send('control', { status: c.status, demo: c.demo, reason: c.reason } satisfies ControlEvent);
     pushControl(game.controlState);
     const stopControl = game.onControl(pushControl);
     const stopBalance = game.onBalance((id, balance) => {
@@ -200,12 +200,20 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   // --- the page -------------------------------------------------------------
 
   if (opts.webDir && existsSync(join(opts.webDir, 'index.html'))) {
+    // The casino bar comes from the casino itself: one loader tag in the page
+    // (game-integration.md section 7). The casino address is runtime config,
+    // never in the image, so the tag goes in when the page is served.
+    const barTag = casinoUrl ? `<script src="${casinoUrl}/bar.js" data-game="${opts.slug}"></script>` : '';
+    const page = readFileSync(join(opts.webDir, 'index.html'), 'utf8').replace('</head>', `    ${barTag}\n  </head>`);
+    const sendPage = (_req: FastifyRequest, reply: FastifyReply) => reply.type('text/html; charset=utf-8').header('Cache-Control', 'no-cache').send(page);
+    app.get('/', sendPage);
+    app.get('/index.html', sendPage);
     await app.register(fastifyStatic, {
       root: opts.webDir,
-      index: ['index.html'],
-      setHeaders: (res, path) => {
-        // Vite fingerprints assets; index.html must always be fresh.
-        res.header('Cache-Control', path.endsWith('index.html') ? 'no-cache' : 'public, max-age=31536000, immutable');
+      index: false,
+      setHeaders: (res) => {
+        // Vite fingerprints assets.
+        res.header('Cache-Control', 'public, max-age=31536000, immutable');
       },
     });
   } else {

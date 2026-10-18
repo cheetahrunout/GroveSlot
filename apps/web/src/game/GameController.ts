@@ -1,7 +1,7 @@
 import { GAMBLE } from '@lowrider/shared/config/features';
 import { PAYLINES } from '@lowrider/shared/config/paylines';
 import { BASE_REELS, ROW_COUNT } from '@lowrider/shared/config/reels';
-import type { PublicState } from '@lowrider/shared/api';
+import { isPlayable, type PublicState } from '@lowrider/shared/api';
 import type { FeatureKey, RoundResult } from '@lowrider/shared/engine/round';
 import { sound } from '../audio/sound';
 import { SKINS } from '../economy/achievements';
@@ -100,16 +100,19 @@ export class GameController {
     store.connected = true;
 
     api.events((c) => {
-      const reopened = store.status !== 'live' && c.status === 'live';
+      const reopened = !isPlayable(store.status) && isPlayable(c.status);
       store.status = c.status;
+      store.demo = c.demo;
       store.reason = c.reason;
-      // A halt closes every session: only the lobby can open a new one.
-      if (c.status === 'halted' || c.status === 'maintenance') store.hasSession = false;
-      if (c.status !== 'live') {
+      // Closed: the casino refunded every open round and closed every session.
+      if (c.status === 'closed') store.hasSession = false;
+      if (!isPlayable(c.status)) {
         this.stopAuto();
         store.gambleOffer = null;
       }
       if (reopened && store.hasSession) void api.state().then((w) => this.applyState(w.state), () => undefined);
+      // Open again after a close: back through the casino for a fresh session.
+      else if (reopened && store.playUrl) window.location.replace(store.playUrl);
     }, ({ balance }) => {
       // A round, a top-up in another tab or another game moved the player's tokens.
       store.balance = balance;
@@ -121,6 +124,7 @@ export class GameController {
     const { store } = this;
     store.status = state.status;
     store.reason = state.reason;
+    store.demo = state.demo;
     store.balance = state.balance;
     store.betOptions = state.betOptions;
     store.wantedStars = state.wantedStars;

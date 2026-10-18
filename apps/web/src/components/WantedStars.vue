@@ -28,7 +28,7 @@ const STAR = 'M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1
 }
 
 .label {
-  font-size: clamp(11px, 1.6vmin, 18px);
+  font-size: clamp(11px, 1.6cqmin, 18px);
   color: var(--grove-color-muted);
   letter-spacing: 0.08em;
 }
@@ -43,7 +43,7 @@ const STAR = 'M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 20.9l1.6-7L2 9.2l7.1
 }
 
 svg {
-  width: clamp(18px, 3vmin, 34px);
+  width: clamp(18px, 3cqmin, 34px);
   aspect-ratio: 1;
   fill: #2a2a2a;
   stroke: var(--grove-color-text);

@@ -17,9 +17,9 @@ describe('sessions', () => {
 
   it('refuses new players when the game is not live', async () => {
     const { game, casino } = await setup();
-    casino.setState({ status: 'last_bets' });
+    casino.setState({ status: 'maintenance' });
     await flush();
-    await expect(game.openSession('cj')).rejects.toMatchObject({ code: 'last_bets' });
+    await expect(game.openSession('cj')).rejects.toMatchObject({ code: 'maintenance' });
   });
 
   it('turns a casino 401 into session_closed and forgets the session', async () => {
@@ -108,16 +108,40 @@ describe('spins', () => {
     expect([...casino.rounds.values()][0].round.status).toBe('void');
   });
 
-  it('obeys last_bets, halted and maintenance at once', async () => {
+  it('obeys maintenance and closed at once', async () => {
     const { game, casino } = await setup();
     const s = await game.openSession('cj');
-    for (const status of ['last_bets', 'halted', 'maintenance'] as const) {
+    for (const status of ['maintenance', 'closed'] as const) {
       casino.setState({ status, reason: 'Testing' });
       await flush();
       await expect(game.spin(s, 20)).rejects.toBeInstanceOf(GameError);
     }
-    // A halt closes every session.
+    // Closed: the casino refunded everything and closed every session.
     expect(game.getSession(s.id)).toBeNull();
+  });
+
+  it('lets a spin in progress finish when maintenance starts', async () => {
+    const { game, casino } = await setup();
+    const s = await game.openSession('cj');
+    const settle = casino.settle.bind(casino);
+    casino.settle = async (a) => {
+      casino.setState({ status: 'maintenance' });
+      return settle(a);
+    };
+    await expect(game.spin(s, 20)).resolves.toBeDefined();
+    expect([...casino.rounds.values()][0].round.status).toBe('settled');
+    await flush();
+    await expect(game.spin(s, 20)).rejects.toMatchObject({ code: 'maintenance' });
+  });
+
+  it('plays exactly as open in demo and tells the page to show the DEMO mark', async () => {
+    const { game, casino } = await setup();
+    casino.setState({ status: 'demo' });
+    await flush();
+    const s = await game.openSession('cj');
+    const { state } = await game.spin(s, 20);
+    expect(state).toMatchObject({ status: 'demo', demo: true });
+    expect([...casino.rounds.values()][0].round.status).toBe('settled');
   });
 
   it('refuses new rounds while the casino is offline', async () => {

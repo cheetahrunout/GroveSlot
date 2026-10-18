@@ -13,7 +13,7 @@ import { Journal } from '../src/journal';
  */
 const KEY = 'test-game-key';
 const control = {
-  status: 'live', status_reason: null, currency: 'euro', unit: null, settings: { gamble_enabled: true },
+  status: 'open', demo: false, status_reason: null, currency: 'euro', unit: null, settings: { gamble_enabled: true },
   limits: { min_bet_cents: 20, max_bet_cents: 500, max_win_cents: 2_500_000, min_bet_micro: 133_333, max_bet_micro: 3_333_333, max_win_micro: 16_666_666_667 },
   rate_micro: 1_500_000, rtp_bps: 9600, multiplayer: false, seats: null, server_time: 0,
 };
@@ -88,7 +88,7 @@ describe('casino SDK integration (stub casino over HTTP)', () => {
     const casino = createCasino({ url: stub.url, key: KEY });
     const { game, stop } = startGame(casino, { rng: createRng(11), journal: new Journal(':memory:'), version: '1.0.42' });
     try {
-      await expect.poll(() => game.controlState.status).toBe('live');
+      await expect.poll(() => game.controlState.status).toBe('open');
       const s = await game.openSession('gh_ok');
       expect(s.player.name).toBe('cj');
       const { result, state } = await game.spin(s, 40);

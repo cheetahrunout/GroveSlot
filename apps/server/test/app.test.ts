@@ -31,7 +31,7 @@ describe('production mode', () => {
 
   it('reports health with the build version', async () => {
     const res = await app.inject('/health');
-    expect(res.json()).toEqual({ ok: true, version: '1.0.42', status: 'live' });
+    expect(res.json()).toEqual({ ok: true, version: '1.0.42', status: 'open' });
   });
 
   it('gives the browser its own secure, HTTP-only cookie and never the casino session', async () => {
@@ -84,7 +84,7 @@ describe('production mode', () => {
   });
 
   it('has no developer routes', async () => {
-    const res = await app.inject({ method: 'POST', url: '/api/dev/control', payload: { status: 'halted' } });
+    const res = await app.inject({ method: 'POST', url: '/api/dev/control', payload: { status: 'closed' } });
     expect(res.statusCode).toBe(404);
   });
 
@@ -111,9 +111,9 @@ describe('local play', () => {
   });
 
   it('switches the stand-in casino state', async () => {
-    await app.inject({ method: 'POST', url: '/api/dev/control', payload: { status: 'last_bets', reason: 'Testing' } });
+    await app.inject({ method: 'POST', url: '/api/dev/control', payload: { status: 'maintenance', reason: 'Testing' } });
     await flush();
-    expect(game.controlState.status).toBe('last_bets');
+    expect(game.controlState.status).toBe('maintenance');
   });
 });
 

@@ -191,7 +191,7 @@ onMounted(() => panel.value?.focus());
 <style scoped>
 .cover {
   position: fixed;
-  inset: 0;
+  inset: var(--grove-bar-top, 0px) var(--grove-bar-right, 0px) var(--grove-bar-bottom, 0px) var(--grove-bar-left, 0px);
   z-index: 4;
   display: grid;
   place-items: center;

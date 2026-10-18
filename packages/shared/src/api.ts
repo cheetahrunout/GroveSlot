@@ -6,11 +6,19 @@ import { z } from 'zod';
  * types are shared so both sides agree on the shape.
  */
 
-/** The casino's four control states. */
-export const CASINO_STATUSES = ['live', 'last_bets', 'halted', 'maintenance'] as const;
+/**
+ * The casino's four control states (game-integration.md section 4): `open`
+ * plays; `demo` plays exactly the same while the casino returns every round
+ * (the page shows a DEMO mark); `maintenance` takes no new players or rounds
+ * but lets hands finish; `closed` has refunded everything and closed every session.
+ */
+export const CASINO_STATUSES = ['open', 'demo', 'maintenance', 'closed'] as const;
 export const CasinoStatusSchema = z.enum(CASINO_STATUSES);
 /** Plus `offline`: the casino has not answered our heartbeats for 90 s, so no new rounds. */
 export type GameStatus = z.infer<typeof CasinoStatusSchema> | 'offline';
+
+/** The states in which players may join and spin. */
+export const isPlayable = (status: GameStatus): boolean => status === 'open' || status === 'demo';
 
 export const FORCEABLE = ['freeSpins', 'lowriderHop', 'holdAndSpin', 'turfWar', 'driveBy'] as const;
 
@@ -50,6 +58,8 @@ export interface Limits {
 /** What the page may know about the game and the player. Never a casino session id. */
 export interface PublicState {
   status: GameStatus;
+  /** The demo state: every round is returned by the casino; the page shows a DEMO mark. */
+  demo: boolean;
   reason: string;
   betOptions: number[];
   limits: Limits;
@@ -74,6 +84,7 @@ export interface Welcome {
 /** SSE `control` event. */
 export interface ControlEvent {
   status: GameStatus;
+  demo: boolean;
   reason: string;
 }
 

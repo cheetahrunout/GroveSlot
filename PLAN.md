@@ -28,7 +28,7 @@ Lowrider now runs as a Grove Casino game under the casino's integration guide (`
 - **No rerolls.** The Wanted Level's "guaranteed win" (which re-spun until it won) became a Payday prize drawn from a table.
 - **Control states, heartbeat, health, scores.** The casino's leaderboard replaces the local one.
 - Manifest `casino-game.json` (RTP 96.00%), Dockerfile and a GHCR image workflow. GitHub Pages hosting was dropped, because the page needs the server.
-- **The casino SDK and money on screen.** The server uses `sdk/casino-game.js` verbatim (calls, `watch()`, `rng`), handles `offline` and refunded rounds, and sends players without a session back through `/play/lowrider`. The page embeds the casino bar, shows tokens (four decimals, rounded down) with their euro value, writes euro Dutch style, follows the casino theme and runs under a CSP. `build-cost.jsonl` is the build ledger.
+- **The casino SDK and money on screen.** The server uses `sdk/casino-game.js` verbatim (calls, `watch()`, `rng`), follows the casino's states `open`, `demo`, `maintenance` and `closed`, handles `offline` and refunded rounds, and sends players without a session back through `/play/lowrider`. The page carries the casino bar loader (`bar.js`, written into the page by the server), lays itself out inside `--grove-bar-*`, shows a DEMO mark in the demo state, shows tokens (four decimals, rounded down) with their euro value, writes euro Dutch style, follows the casino theme and runs under a CSP. `build-cost.jsonl` is the build ledger.
 - **RTP re-measured.** 40 million CSPRNG rounds showed the game paying about 95.1%, under the declared 96%: free spins delivered about a point under budget. The Wanted Payday table moved from an 8.4× to a 9.48× mean (6× to 28×), which measured 96.06% (±0.22) over 40 million rounds.
 - **Grove game technology standard.** The repo is a pnpm workspace (`apps/web`, `apps/server`, `packages/shared`): Vue 3 + Pinia own the HUD, menus and bonus prompts; PixiJS owns the canvas; Fastify + Zod + SQLite (round references and Wanted levels only) on Node 24 own the game. CI is the standard `build.yml` (numbered GHCR images `1.0.<n>`). The tables and trees in §2 and §6 below are updated to match.
 
@@ -174,7 +174,7 @@ apps/
     rng.ts                # the engine's Rng on top of the SDK's rng (crypto.randomInt)
   web/src/
     main.ts               # Pixi app + Vue app + Pinia, wires the controller
-    App.vue, components/  # header, HUD, action bar (bonus prompts), menu, status screens, toasts, casino bar
+    App.vue, components/  # header, HUD, action bar (bonus prompts), menu, status screens, toasts, DEMO mark
     stores/game.ts        # Pinia UI state
     design/tokens.ts      # Grove tokens → CSS variables, following the casino theme
     game/                 # GameController, API client, presenters that play each bonus back

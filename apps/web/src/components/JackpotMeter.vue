@@ -48,7 +48,7 @@ const store = useGameStore();
 
 .crown {
   grid-row: span 2;
-  width: clamp(28px, 5vmin, 56px);
+  width: clamp(28px, 5cqmin, 56px);
   aspect-ratio: 1;
   object-fit: cover;
   object-position: center;
@@ -56,7 +56,7 @@ const store = useGameStore();
 }
 
 .name {
-  font-size: clamp(11px, 1.7vmin, 18px);
+  font-size: clamp(11px, 1.7cqmin, 18px);
   color: var(--grove-color-muted);
   letter-spacing: 0.06em;
 }
@@ -66,7 +66,7 @@ const store = useGameStore();
 }
 
 .value {
-  font-size: clamp(16px, 2.8vmin, 32px);
+  font-size: clamp(16px, 2.8cqmin, 32px);
   color: var(--grove-color-gold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

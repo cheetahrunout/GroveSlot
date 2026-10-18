@@ -39,11 +39,11 @@ watch(
 }
 
 .counter {
-  font-size: clamp(18px, 3.4vmin, 40px);
+  font-size: clamp(18px, 3.4cqmin, 40px);
 }
 
 .multiplier {
-  font-size: clamp(28px, 5.5vmin, 64px);
+  font-size: clamp(28px, 5.5cqmin, 64px);
   color: var(--grove-color-gold);
 }
 
@@ -70,14 +70,14 @@ watch(
 }
 
 .wall-label {
-  font-size: clamp(11px, 1.6vmin, 18px);
+  font-size: clamp(11px, 1.6cqmin, 18px);
   color: var(--grove-color-text);
   text-shadow: 0 2px 2px #000;
 }
 
 .tag {
   font-family: var(--grove-font-tag);
-  font-size: clamp(24px, 4.5vmin, 52px);
+  font-size: clamp(24px, 4.5cqmin, 52px);
   color: #7dff6a;
   -webkit-text-stroke: 2px var(--grove-color-background);
   opacity: 0.15;

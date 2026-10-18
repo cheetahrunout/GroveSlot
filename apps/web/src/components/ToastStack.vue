@@ -18,7 +18,7 @@ const store = useGameStore();
 <style scoped>
 .toasts {
   position: fixed;
-  top: max(16px, env(safe-area-inset-top, 0px));
+  top: calc(var(--grove-bar-top, 0px) + max(16px, env(safe-area-inset-top, 0px)));
   left: 50%;
   transform: translateX(-50%);
   z-index: 6;

@@ -18,6 +18,16 @@ export interface StageRect {
  * The PixiJS canvas: backdrop, reels, bonus scenes and effects. Menus, the
  * HUD and every button live in Vue on top of it.
  */
+/** Pixels the casino bar covers on each side of the window. */
+export interface Insets {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
+
 export class GameScene extends Container {
   readonly reels: ReelsView;
   /** Full-screen layer for bonus games and effects, in design coordinates. */
@@ -56,10 +66,10 @@ export class GameScene extends Container {
 
   /**
    * `viewport` is the canvas size and `stage` the free area for the reels, both
-   * in CSS pixels. `reservedBottom` is covered by the casino bar: the backdrop
-   * still paints it, the bonus scenes stay above it.
+   * in CSS pixels. `insets` is what the casino bar covers on each side (its
+   * strip and docked panes): the backdrop still paints it, the bonus scenes keep clear.
    */
-  arrange(viewport: { width: number; height: number }, stage: StageRect, reservedBottom = 0): void {
+  arrange(viewport: { width: number; height: number }, stage: StageRect, insets: Insets = NO_INSETS): void {
     this.viewport = viewport;
     this.drawBackdrop();
 
@@ -73,7 +83,8 @@ export class GameScene extends Container {
     );
 
     // Bonus scenes and effects work in a fixed design resolution, letterboxed.
-    this.layout = computeLayout(viewport.width, Math.max(1, viewport.height - reservedBottom));
+    this.layout = computeLayout(Math.max(1, viewport.width - insets.left - insets.right), Math.max(1, viewport.height - insets.top - insets.bottom));
+    this.layout = { ...this.layout, offsetX: this.layout.offsetX + insets.left, offsetY: this.layout.offsetY + insets.top };
     this.designRoot.scale.set(this.layout.scale);
     this.designRoot.position.set(this.layout.offsetX, this.layout.offsetY);
     // Announcements sit over the reels.

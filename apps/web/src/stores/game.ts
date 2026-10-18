@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { JACKPOTS, type JackpotId } from '@lowrider/shared/config/features';
-import type { Balance, GameStatus } from '@lowrider/shared/api';
+import { isPlayable, type Balance, type GameStatus } from '@lowrider/shared/api';
 import type { FreeSpinsHud, UiMode } from '../game/ui';
 import type { Choice } from '../view/ask';
 
@@ -39,9 +39,9 @@ export const useGameStore = defineStore('game', {
     /** Where a player without a session goes to get one (CASINO_PUBLIC_URL/play/lowrider). */
     playUrl: '',
     slug: 'lowrider',
-    /** Height of the casino bar at the bottom of the page (it grows when its panels open). */
-    barHeight: 0,
-    status: 'maintenance' as GameStatus,
+    status: 'closed' as GameStatus,
+    /** The demo state: rounds are real but the casino returns every one. */
+    demo: false,
     reason: '',
     balance: null as Balance | null,
     betOptions: [] as number[],
@@ -64,10 +64,10 @@ export const useGameStore = defineStore('game', {
 
   getters: {
     canSpin(state): boolean {
-      return state.hasSession && state.status === 'live' && state.betCents > 0 && !state.busy && !state.menuOpen && state.mode !== 'bonus';
+      return state.hasSession && isPlayable(state.status) && state.betCents > 0 && !state.busy && !state.menuOpen && state.mode !== 'bonus';
     },
     canGamble(state): boolean {
-      return !!state.gambleOffer && state.showGamble && state.status === 'live' && !state.busy && state.autoRemaining === null && state.mode === 'base';
+      return !!state.gambleOffer && state.showGamble && isPlayable(state.status) && !state.busy && state.autoRemaining === null && state.mode === 'base';
     },
     betIndex(state): number {
       return state.betOptions.indexOf(state.betCents);
@@ -83,11 +83,8 @@ export const useGameStore = defineStore('game', {
     statusMessage(state): StatusMessage | null {
       const lobbyUrl = state.casinoUrl;
       if (!state.connected) return null;
-      if (state.status === 'halted') {
-        return { mode: 'full', title: 'Game paused', body: state.reason || 'Lowrider is paused by the casino. Any open round was refunded.', lobbyUrl };
-      }
-      if (state.status === 'maintenance') {
-        return { mode: 'full', title: 'Maintenance', body: state.reason || 'Lowrider is closed for planned work. Any open round was refunded.', lobbyUrl };
+      if (state.status === 'closed') {
+        return { mode: 'full', title: 'Closed', body: state.reason || 'Lowrider is closed right now. Any open round was refunded.', lobbyUrl };
       }
       if (state.status === 'offline') {
         return { mode: 'strip', title: 'Casino unreachable', body: state.reason || 'The casino is not answering. Spins are paused until it is back.', lobbyUrl };
@@ -95,8 +92,8 @@ export const useGameStore = defineStore('game', {
       if (!state.hasSession) {
         return { mode: 'full', title: 'Lowrider', body: state.playUrl ? 'Taking you to Grove Casino to sign in…' : 'Open Lowrider from the Grove Casino lobby to play.', lobbyUrl };
       }
-      if (state.status === 'last_bets') {
-        return { mode: 'strip', title: 'Last bets', body: state.reason || 'No new spins: the game is closing for a moment.', lobbyUrl };
+      if (state.status === 'maintenance') {
+        return { mode: 'strip', title: 'Maintenance', body: state.reason || 'No new spins for a moment: Lowrider is getting a tune-up.', lobbyUrl };
       }
       if (state.betOptions.length === 0) return { mode: 'full', title: 'No open bets', body: 'The casino limits leave no bet open right now.', lobbyUrl };
       return null;

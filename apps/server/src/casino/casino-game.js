@@ -78,9 +78,9 @@ function createCasino(opts) {
         // a small loop that keeps `state` current: status, settings, limits; heartbeat every 30 s; other events
         // (balance: {session, player} whenever a player's tokens change) go to onEvent(type, data)
         watch(state, extra, onEvent) {
-            state.status = state.status || 'maintenance'; state.settings = state.settings || {}; state.limits = state.limits || null;
+            state.status = state.status || 'closed'; state.settings = state.settings || {}; state.limits = state.limits || null;
             state.link = 'down'; state.link_ts = 0;   // the heartbeat is the liveness signal both ways
-            const apply = c => { if (!c) return; state.status = c.status; state.settings = c.settings || {}; state.limits = c.limits || state.limits; state.rtp_bps = c.rtp_bps; state.updated = Date.now(); state.link = 'up'; state.link_ts = Date.now(); };
+            const apply = c => { if (!c) return; state.status = c.status; state.demo = !!c.demo; state.settings = c.settings || {}; state.limits = c.limits || state.limits; state.rtp_bps = c.rtp_bps; state.updated = Date.now(); state.link = 'up'; state.link_ts = Date.now(); };
             const beat = () => api.heartbeat(Object.assign({}, typeof extra === 'function' ? extra() : extra)).then(apply).catch(e => {
                 console.error('[casino] heartbeat:', e.message);
                 // the casino is not answering: after LINK_DOWN_MS refuse new rounds (status 'offline') until it answers again;

@@ -102,20 +102,20 @@ function startAuto(n: number): void {
 }
 
 .caption {
-  font-size: clamp(11px, 1.6vmin, 18px);
+  font-size: clamp(11px, 1.6cqmin, 18px);
   color: var(--grove-color-muted);
   letter-spacing: 0.08em;
 }
 
 .value {
-  font-size: clamp(18px, 3.6vmin, 42px);
+  font-size: clamp(18px, 3.6cqmin, 42px);
   color: var(--grove-color-gold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .worth {
-  font-size: clamp(10px, 1.5vmin, 16px);
+  font-size: clamp(10px, 1.5cqmin, 16px);
   color: var(--grove-color-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -123,7 +123,7 @@ function startAuto(n: number): void {
 
 .step {
   padding: 0.1em 0.55em;
-  font-size: clamp(18px, 3vmin, 32px);
+  font-size: clamp(18px, 3cqmin, 32px);
 }
 
 .toggles {
@@ -152,14 +152,14 @@ function startAuto(n: number): void {
 
 .spin {
   pointer-events: auto;
-  width: clamp(76px, 15vmin, 170px);
+  width: clamp(76px, 15cqmin, 170px);
   aspect-ratio: 1;
   border-radius: 50%;
   border: 5px solid var(--grove-color-text);
   background: radial-gradient(circle at 35% 30%, var(--grove-color-grove-light), var(--grove-color-grove) 60%);
   color: var(--grove-color-text);
   font-family: var(--grove-font-ui);
-  font-size: clamp(22px, 4.5vmin, 52px);
+  font-size: clamp(22px, 4.5cqmin, 52px);
   letter-spacing: 0.04em;
   cursor: pointer;
   box-shadow: 0 6px 0 #0a2a0a;
@@ -187,7 +187,7 @@ function startAuto(n: number): void {
   white-space: nowrap;
 }
 
-@media (orientation: portrait) {
+@container game (orientation: portrait) {
   .hud {
     grid-template-columns: 1fr 1fr;
     grid-template-areas:

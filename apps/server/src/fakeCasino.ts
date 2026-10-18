@@ -34,7 +34,8 @@ export class FakeCasino implements Casino {
   readonly calls: string[] = [];
   readonly heartbeats: { version?: string; players?: number }[] = [];
   control_: Control = {
-    status: 'live',
+    status: 'open',
+    demo: false,
     status_reason: null,
     currency: 'euro',
     unit: null,
@@ -87,14 +88,17 @@ export class FakeCasino implements Casino {
   /** Switches the control state like the admin page does. */
   setState(patch: { status?: GameStatus; reason?: string; settings?: Record<string, unknown>; limitsCents?: { min: number; max: number; maxWin: number } }): void {
     const c = this.control_;
-    if (patch.status) c.status = patch.status;
+    if (patch.status) {
+      c.status = patch.status;
+      c.demo = patch.status === 'demo';
+    }
     if (patch.limitsCents) {
       const { min, max, maxWin } = patch.limitsCents;
       c.limits = { min_bet_cents: min, max_bet_cents: max, max_win_cents: maxWin, min_bet_micro: centsToMicro(min), max_bet_micro: centsToMicro(max), max_win_micro: centsToMicro(maxWin) };
     }
     if (patch.reason !== undefined) c.status_reason = patch.reason || null;
     if (patch.settings) c.settings = patch.settings;
-    if (c.status === 'halted' || c.status === 'maintenance') {
+    if (c.status === 'closed') {
       this.refundOpenRounds('halt');
       this.sessions.clear();
     }
@@ -120,7 +124,7 @@ export class FakeCasino implements Casino {
   async openSession(token: string) {
     this.maybeFail('openSession');
     if (!token) throw new CasinoError('bad token', 401, { error: 'bad token' });
-    if (this.control_.status !== 'live') throw new CasinoError('not live', 409, { error: 'not live', game_status: this.control_.status });
+    if (this.control_.status !== 'open' && this.control_.status !== 'demo') throw new CasinoError('not open', 409, { error: 'not open', game_status: this.control_.status });
     const key = `player-${token}`;
     if (!this.wallets.has(key)) this.wallets.set(key, this.startTokens * 1e6);
     const session = randomUUID();
@@ -142,7 +146,7 @@ export class FakeCasino implements Casino {
     this.maybeFail('openRound');
     const key = this.sessions.get(a.session);
     if (!key) throw new CasinoError('bad session', 401, { error: 'bad session' });
-    if (this.control_.status !== 'live') throw new CasinoError('not live', 409, { error: 'not live', game_status: this.control_.status });
+    if (this.control_.status !== 'open' && this.control_.status !== 'demo') throw new CasinoError('not open', 409, { error: 'not open', game_status: this.control_.status });
     const cents = a.betCents ?? 0;
     const { min_bet_cents, max_bet_cents } = this.control_.limits;
     if (!Number.isInteger(cents) || cents < min_bet_cents || cents > max_bet_cents) throw new CasinoError('bet outside limits', 400, { error: 'bet outside limits' });
@@ -247,6 +251,7 @@ export class FakeCasino implements Casino {
 
 function apply(state: WatchState, c: Control): void {
   state.status = c.status;
+  state.demo = !!c.demo;
   state.settings = c.settings || {};
   state.limits = c.limits || state.limits;
   state.rtp_bps = c.rtp_bps;

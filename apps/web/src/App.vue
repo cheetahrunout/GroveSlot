@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { inject, onBeforeUnmount, onMounted, ref } from 'vue';
 import ActionBar from './components/ActionBar.vue';
-import CasinoBar from './components/CasinoBar.vue';
+import DemoMark from './components/DemoMark.vue';
 import GameHeader from './components/GameHeader.vue';
 import GameHud from './components/GameHud.vue';
 import MenuPanel from './components/MenuPanel.vue';
@@ -10,18 +10,25 @@ import ToastStack from './components/ToastStack.vue';
 import { CONTROLLER, SCENE } from './game/injection';
 import { answer } from './game/prompt';
 import { useGameStore } from './stores/game';
+import type { Insets } from './view/GameScene';
 
 const store = useGameStore();
 const scene = inject(SCENE)!;
 const controller = inject(CONTROLLER)!;
 const stage = ref<HTMLElement | null>(null);
 
-/** Tells the canvas where the Vue layout leaves room for the reels. */
+/** What the casino bar covers right now: its loader keeps --grove-bar-* current on the root element. */
+function barInsets(): Insets {
+  const css = getComputedStyle(document.documentElement);
+  const px = (side: string) => parseFloat(css.getPropertyValue(`--grove-bar-${side}`)) || 0;
+  return { top: px('top'), right: px('right'), bottom: px('bottom'), left: px('left') };
+}
+
+/** Tells the canvas where the Vue layout leaves room for the reels, and what the casino bar covers. */
 function arrange(): void {
   if (!stage.value) return;
   const r = stage.value.getBoundingClientRect();
-  // The casino bar takes the bottom of the window; the game gets the rest.
-  scene.arrange({ width: window.innerWidth, height: window.innerHeight }, { x: r.left, y: r.top, width: r.width, height: r.height }, store.barHeight);
+  scene.arrange({ width: window.innerWidth, height: window.innerHeight }, { x: r.left, y: r.top, width: r.width, height: r.height }, barInsets());
 }
 
 function onKey(e: KeyboardEvent): void {
@@ -35,46 +42,49 @@ function onKey(e: KeyboardEvent): void {
 }
 
 let observer: ResizeObserver | null = null;
-watch(
-  () => store.barHeight,
-  (h) => {
-    document.documentElement.style.setProperty('--bar-h', `${h}px`);
-    void nextTick(arrange);
-  },
-);
+// The bar's panes open, close and move: the loader rewrites the variables on the root's style.
+const barObserver = new MutationObserver(() => requestAnimationFrame(arrange));
 
 onMounted(() => {
   observer = new ResizeObserver(arrange);
   if (stage.value) observer.observe(stage.value);
+  barObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
   window.addEventListener('resize', arrange);
   window.addEventListener('keydown', onKey);
   arrange();
 });
 onBeforeUnmount(() => {
   observer?.disconnect();
+  barObserver.disconnect();
   window.removeEventListener('resize', arrange);
   window.removeEventListener('keydown', onKey);
 });
 </script>
 
 <template>
-  <main class="layout" :style="{ bottom: `${store.barHeight}px` }">
+  <main class="layout">
     <GameHeader class="top" :class="{ away: store.mode === 'bonus' }" />
     <div ref="stage" class="stage" aria-hidden="true"></div>
     <GameHud class="bottom" :class="{ away: store.mode === 'bonus' }" />
-    <p class="disclaimer" :class="{ away: store.mode === 'bonus' }">For fun only. No real money is played here.</p>
+    <p class="disclaimer" :class="{ away: store.mode === 'bonus' && !store.demo }">
+      <DemoMark v-if="store.demo" />
+      For fun only. No real money is played here.
+    </p>
   </main>
   <ActionBar />
   <ToastStack />
   <MenuPanel v-if="store.menuOpen" />
   <StatusOverlay />
-  <CasinoBar v-if="store.casinoUrl" />
 </template>
 
 <style scoped>
 .layout {
   position: absolute;
-  inset: 0;
+  /* Clear of the casino bar: its strip on top, its panes docked left, right or bottom. */
+  inset: var(--grove-bar-top, 0px) var(--grove-bar-right, 0px) var(--grove-bar-bottom, 0px) var(--grove-bar-left, 0px);
+  /* The HUD sizes itself to the room the bar leaves, not to the window (cqmin units, container queries). */
+  container: game / size;
+  --hud-gap: clamp(6px, 1.2cqmin, 14px);
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto auto;
   gap: var(--hud-gap);
@@ -104,7 +114,7 @@ onBeforeUnmount(() => {
 .disclaimer {
   margin: 0;
   text-align: center;
-  font-size: clamp(10px, 1.5vmin, 15px);
+  font-size: clamp(10px, 1.5cqmin, 15px);
   color: var(--grove-color-muted);
 }
 </style>

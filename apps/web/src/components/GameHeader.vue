@@ -36,7 +36,7 @@ const store = useGameStore();
   margin: 0;
   font-family: var(--grove-font-tag);
   font-weight: 400;
-  font-size: clamp(36px, 8vmin, 96px);
+  font-size: clamp(36px, 8cqmin, 96px);
   line-height: 1;
   color: var(--grove-color-text);
   -webkit-text-stroke: 3px var(--grove-color-grove);
@@ -52,7 +52,7 @@ const store = useGameStore();
   justify-self: center;
 }
 
-@media (orientation: portrait) {
+@container game (orientation: portrait) {
   .header {
     grid-template-columns: 1fr;
     grid-template-areas: 'title' 'jackpots' 'wanted';

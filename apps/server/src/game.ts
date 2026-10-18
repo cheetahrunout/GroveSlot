@@ -4,7 +4,7 @@ import { PAYLINES } from '@lowrider/shared/config/paylines';
 import { canGamble, playGamble, type Alley } from '@lowrider/shared/engine/features/gamble';
 import type { Rng } from '@lowrider/shared/engine/rng';
 import { playRound, type FeatureKey, type RoundResult } from '@lowrider/shared/engine/round';
-import type { Balance, GameStatus, Limits, PublicState } from '@lowrider/shared/api';
+import { isPlayable, type Balance, type GameStatus, type Limits, type PublicState } from '@lowrider/shared/api';
 import { CasinoError, errorData, retryable, rng as casinoRng, toBalance, toLimits, type Casino, type Player, type WatchState } from './casino';
 import type { Journal } from './journal';
 
@@ -27,6 +27,7 @@ const CONTROL_REFRESH_MS = 5 * 60 * 1000;
 /** What the page needs to know about the control state. */
 export interface ControlView {
   status: GameStatus;
+  demo: boolean;
   reason: string;
   limits: Limits;
   settings: Record<string, unknown>;
@@ -100,8 +101,9 @@ export class LowriderGame {
 
   private readView(): ControlView {
     const status = this.state.status;
-    const reason = status === 'offline' ? 'The casino is not answering. Spins are paused until it is back.' : status === 'live' ? '' : this.reason;
-    return { status, reason, limits: toLimits(this.state.limits), settings: this.state.settings ?? {} };
+    const reason = status === 'offline' ? 'The casino is not answering. Spins are paused until it is back.' : status === 'open' ? '' : this.reason;
+    const demo = status === 'demo' || (isPlayable(status) && this.state.demo === true);
+    return { status, demo, reason, limits: toLimits(this.state.limits), settings: this.state.settings ?? {} };
   }
 
   get controlState(): ControlView {
@@ -129,13 +131,13 @@ export class LowriderGame {
     this.view = next;
     if (next.status !== before.status) {
       this.log('control', { status: next.status });
-      if (next.status !== 'live' && next.status !== 'offline') void this.refreshControl(true);
+      if (next.status !== 'open' && next.status !== 'offline') void this.refreshControl(true);
     }
-    if (next.status === 'halted' || next.status === 'maintenance') {
+    if (next.status === 'closed') {
       // The casino has refunded open rounds and closed every session.
       this.sessions.clear();
     }
-    if (next.status !== 'live') for (const s of this.sessions.values()) s.gamble = null;
+    if (!isPlayable(next.status)) for (const s of this.sessions.values()) s.gamble = null;
     for (const l of this.listeners) l(next);
   }
 
@@ -210,7 +212,7 @@ export class LowriderGame {
   // --- sessions ------------------------------------------------------------
 
   async openSession(token: string): Promise<PlayerSession> {
-    if (this.view.status !== 'live') {
+    if (!isPlayable(this.view.status)) {
       throw new GameError(409, this.view.status, this.view.reason || 'Lowrider is closed right now.');
     }
     let opened;
@@ -263,6 +265,7 @@ export class LowriderGame {
   publicState(s: PlayerSession | null): PublicState {
     return {
       status: this.view.status,
+      demo: this.view.demo,
       reason: this.view.reason,
       betOptions: betOptions(this.view.limits),
       limits: this.view.limits,
@@ -279,11 +282,14 @@ export class LowriderGame {
   private requireLive(): void {
     if (this.stopping) throw new GameError(503, 'restarting', 'Lowrider is restarting. Try again in a moment.');
     const { status, reason } = this.view;
-    if (status === 'live') return;
+    if (isPlayable(status)) return;
     const message =
-      status === 'last_bets'
-        ? 'Last bets have been called: no new spins right now.'
-        : reason || (status === 'maintenance' ? 'Lowrider is closed for planned work.' : 'Lowrider is paused.');
+      reason ||
+      (status === 'maintenance'
+        ? 'Lowrider is in maintenance: no new spins right now.'
+        : status === 'offline'
+          ? 'The casino is not answering. Spins are paused until it is back.'
+          : 'Lowrider is closed right now.');
     throw new GameError(409, status, message);
   }
 
@@ -494,12 +500,12 @@ export class LowriderGame {
 
 /**
  * The state object casino.watch() keeps current (status, settings, limits).
- * The game is told the moment anything changes, so a halt or `last_bets`
+ * The game is told the moment anything changes, so `closed` or `maintenance`
  * applies at once.
  */
 export function watchedState(onChange: () => void): WatchState {
   return new Proxy<WatchState>(
-    { status: 'maintenance', settings: {}, limits: null },
+    { status: 'closed', settings: {}, limits: null },
     {
       set(target, key, value) {
         Reflect.set(target, key, value);

@@ -20,7 +20,7 @@ const store = useGameStore();
 <style scoped>
 .strip {
   position: fixed;
-  inset: 0 0 auto;
+  inset: var(--grove-bar-top, 0px) var(--grove-bar-right, 0px) auto var(--grove-bar-left, 0px);
   z-index: 4;
   padding: max(8px, env(safe-area-inset-top, 0px)) 16px 8px;
   background: var(--grove-color-danger);
@@ -31,7 +31,8 @@ const store = useGameStore();
 
 .cover {
   position: fixed;
-  inset: 0;
+  /* The casino bar stays usable (Top up, the lobby) over every screen. */
+  inset: var(--grove-bar-top, 0px) var(--grove-bar-right, 0px) var(--grove-bar-bottom, 0px) var(--grove-bar-left, 0px);
   z-index: 5;
   display: grid;
   place-items: center;

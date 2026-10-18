@@ -50,7 +50,7 @@ export const api = {
     call<{ escape: Alley; won: boolean; stake: number; canContinue: boolean; state: PublicState }>('POST', '/api/gamble', { pick }),
   collect: () => call<{ state: PublicState }>('POST', '/api/collect', {}),
   leave: () => navigator.sendBeacon?.('/api/leave'),
-  /** Live control state (live, last bets, halted, maintenance, offline) and the player's balance. */
+  /** Live control state (open, demo, maintenance, closed, offline) and the player's balance. */
   events: (onControl: (c: ControlEvent) => void, onBalance: (b: BalanceEvent) => void): EventSource => {
     const source = new EventSource('/api/events');
     const listen = <T>(type: string, handler: (data: T) => void) =>
