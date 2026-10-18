@@ -1,6 +1,6 @@
 # GroveSlot: Project Plan
 
-A browser slot machine themed on Grove Street (GTA: San Andreas). You play with **free tokens only**. There is no real money, no purchases and no cash-out. It's just for fun.
+The game is called **Lowrider** (the project and repository stay GroveSlot). A browser slot machine themed on Grove Street (GTA: San Andreas). You play with **free tokens only**. There is no real money, no purchases and no cash-out. It's just for fun.
 
 ---
 
@@ -190,6 +190,11 @@ Prep before use:
 - Cut the emblems out to transparent PNGs/WebP, so they can glow, pulse and sit on any background, and pack them into a texture atlas with the other symbols.
 - Draw the rest of the symbols in the same style (bold white outlines, flat green/black shading) so the set looks consistent.
 - Palette note: the blue Palm G stands out from the green set, which suits a special trigger symbol.
+
+### Bonus transitions
+- Every bonus (Free Spins, Lowrider Hop, Cash Run, Turf War, Car Chase) opens with the same signature move: a green lowrider hops across the screen, diagonal paint stripes in that bonus's colours sweep in behind it, and the bonus name is sprayed on in graffiti. The bonus scene is built underneath while the screen is covered, then the stripes sweep away to reveal it.
+- The way back uses the same stripes, without a title; Free Spins ends with a "FREE SPINS WIN" title showing the total.
+- Code: `src/view/Transition.ts`, shared by `src/game/presenters/overlayBonus.ts`.
 
 ### General direction
 - Palette: Grove green (#1f7a1f-ish), sunset orange and purple, concrete grey, gold accents.

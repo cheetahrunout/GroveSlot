@@ -35,7 +35,7 @@ export class GameScene extends Container {
     this.jackpots = new JackpotBar(textures.kingpin);
     this.hud = new HUD(handlers);
     this.title = new Text({
-      text: 'GROVESLOT',
+      text: 'LOWRIDER',
       style: textStyle(COLORS.text, 92, { fontFamily: FONT_TAG, stroke: { color: COLORS.grove, width: 8 } }),
     });
     this.title.anchor.set(0.5, 0);

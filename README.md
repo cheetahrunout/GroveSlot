@@ -1,6 +1,6 @@
-# GroveSlot
+# Lowrider
 
-A Grove Street themed slot machine for the browser, inspired by GTA: San Andreas. You play with **free tokens only**: no real money, no purchases, no cash-out. It's just for fun.
+**Lowrider** is a Grove Street themed slot machine for the browser, inspired by GTA: San Andreas. The project and repository are called GroveSlot. You play with **free tokens only**: no real money, no purchases, no cash-out. It's just for fun.
 
 ## Features
 
@@ -14,6 +14,7 @@ A Grove Street themed slot machine for the browser, inspired by GTA: San Andreas
 - **Car Chase:** after a win, gamble double or nothing by picking an alley.
 - **Free tokens:** you start with 10,000, get a daily allowance of 2,000, and a once-an-hour top-up if you go broke.
 - **Progress:** stats, 11 trophies, unlockable reel skins and a local leaderboard, all in MENU.
+- Every bonus opens and closes with a paint-stripe transition: a lowrider hops across the screen, the stripes follow, and the bonus name is sprayed on.
 - Original artwork and synthesised sound and music. The three G emblems are the provided artwork in `public/assets/symbols/`.
 
 Payback is tuned to about **96%** (the measured value is 95.8% over 10 million simulated rounds). It's play money, but the maths is honest, and the simulator checks it on every commit.

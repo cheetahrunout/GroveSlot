@@ -1,29 +1,19 @@
 import type { TurfWarResult } from '../../engine/features/turfWar';
 import { TurfWarScene } from '../../view/scenes/TurfWarScene';
-import { sound } from '../../audio/sound';
-import { tween } from '../../view/tween';
+import { TRANSITION_COLORS } from '../../view/Transition';
 import type { PresentContext } from './context';
+import { presentOverlayBonus } from './overlayBonus';
 
-export async function presentTurfWar(ctx: PresentContext, turf: TurfWarResult): Promise<void> {
-  const { scene } = ctx;
-  if (turf.trigger === 'symbols') {
-    const palms = scene.reels.currentGrid.flatMap((column, reel) =>
-      column.flatMap((s, row) => (s === 'TURF' ? [{ reel, row }] : [])),
-    );
-    scene.reels.highlight(palms);
-    sound.play('bonus');
-  await scene.banner.show('TURF WAR!', 'Three Palm G on the block', 1100);
-  } else {
-    sound.play('siren');
-    await scene.banner.show('TURF WAR!', 'The Ballas rolled up on you', 1100, '#c58cf0');
-  }
-  scene.reels.clearWins();
-
-  const view = new TurfWarScene(scene.layout);
-  view.alpha = 0;
-  scene.overlay.addChild(view);
-  await tween(view, { alpha: 1 }, 300);
-  await view.play(turf, ctx.auto, (amount) => ctx.addWin(amount));
-  await tween(view, { alpha: 0 }, 300);
-  view.destroy({ children: true });
+export function presentTurfWar(ctx: PresentContext, turf: TurfWarResult): Promise<void> {
+  const grid = ctx.scene.reels.currentGrid;
+  const bySymbols = turf.trigger === 'symbols';
+  return presentOverlayBonus(ctx, {
+    trigger: bySymbols ? grid.flatMap((column, reel) => column.flatMap((s, row) => (s === 'TURF' ? [{ reel, row }] : []))) : [],
+    triggerSound: bySymbols ? 'bonus' : 'siren',
+    colors: TRANSITION_COLORS.turfWar,
+    title: 'TURF WAR',
+    sub: bySymbols ? 'Three Palm G on the block' : 'The Ballas rolled up on you',
+    createView: () => new TurfWarScene(ctx.scene.layout),
+    play: (view) => view.play(turf, ctx.auto, (amount) => ctx.addWin(amount)),
+  });
 }

@@ -16,8 +16,9 @@ import { bagLabels } from '../view/format';
 import type { GameScene } from '../view/GameScene';
 import { CarChaseScene } from '../view/scenes/CarChaseScene';
 import { MenuPanel } from '../view/scenes/MenuPanel';
+import { TRANSITION_COLORS, playTransition } from '../view/Transition';
 import { COLORS } from '../view/theme';
-import { countUp, timing, tween, wait } from '../view/tween';
+import { countUp, timing, wait } from '../view/tween';
 import { fmt, type PresentContext } from './presenters/context';
 import { presentFreeSpins } from './presenters/freeSpins';
 import { presentHoldAndSpin } from './presenters/holdAndSpin';
@@ -218,17 +219,28 @@ export class GameController {
       wallet.debit(offer);
       let final = 0;
       try {
-        const view = new CarChaseScene(scene.layout);
-        view.alpha = 0;
-        scene.overlay.addChild(view);
-        await tween(view, { alpha: 1 }, 250);
-        final = await view.play(offer, (pick, stake) => {
-          const outcome = playGamble(this.rng, pick, stake);
-          this.toastAchievements(this.progress.recordChase(outcome.won));
-          return outcome;
+        let view!: CarChaseScene;
+        let chase!: Promise<number>;
+        await playTransition(scene.overlay, scene.layout, {
+          colors: TRANSITION_COLORS.carChase,
+          title: 'CAR CHASE',
+          sub: `${fmt(offer)} ON THE LINE`,
+          hold: 700,
+          onCovered: () => {
+            view = new CarChaseScene(scene.layout);
+            scene.overlay.addChildAt(view, 0);
+            chase = view.play(offer, (pick, stake) => {
+              const outcome = playGamble(this.rng, pick, stake);
+              this.toastAchievements(this.progress.recordChase(outcome.won));
+              return outcome;
+            });
+          },
         });
-        await tween(view, { alpha: 0 }, 250);
-        view.destroy({ children: true });
+        final = await chase;
+        await playTransition(scene.overlay, scene.layout, {
+          colors: TRANSITION_COLORS.carChase,
+          onCovered: () => view.destroy({ children: true }),
+        });
       } finally {
         wallet.credit(final);
       }

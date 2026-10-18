@@ -2,6 +2,7 @@ import { FREE_SPINS } from '../../config/features';
 import { FREE_SPIN_REELS } from '../../config/reels';
 import type { FreeSpinsResult } from '../../engine/features/freeSpins';
 import { sound } from '../../audio/sound';
+import { TRANSITION_COLORS, playTransition } from '../../view/Transition';
 import { wait } from '../../view/tween';
 import { fmt, type PresentContext } from './context';
 
@@ -11,11 +12,19 @@ export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult)
   const baseGrid = reels.currentGrid.map((c) => [...c]);
   const baseLabels = reels.currentLabels;
 
-  sound.play('bonus');
-  await banner.show('FREE SPINS!', `${fs.initialSpins} GROVE STREET FREE SPINS`, 1300);
-  scene.setMode('freeSpins');
   let multiplier = 1;
-  bar.update(1, fs.initialSpins, multiplier, 0, false);
+  sound.play('bonus');
+  await wait(900);
+  await playTransition(scene.overlay, scene.layout, {
+    colors: TRANSITION_COLORS.freeSpins,
+    title: 'FREE SPINS',
+    sub: `${fs.initialSpins} GROVE STREET FREE SPINS`,
+    onCovered: () => {
+      reels.clearWins();
+      scene.setMode('freeSpins');
+      bar.update(1, fs.initialSpins, multiplier, 0, false);
+    },
+  });
 
   for (const [i, spin] of fs.spins.entries()) {
     const totalSoFar = i + 1 + spin.spinsLeft - spin.addedSpins;
@@ -53,7 +62,14 @@ export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult)
   }
 
   reels.clearWins();
-  await banner.show('FREE SPINS WIN', fmt(fs.totalWin), 1500);
-  scene.setMode('base');
-  reels.show(baseGrid, baseLabels);
+  await playTransition(scene.overlay, scene.layout, {
+    colors: TRANSITION_COLORS.freeSpins,
+    title: 'FREE SPINS WIN',
+    sub: fmt(fs.totalWin),
+    hold: 1300,
+    onCovered: () => {
+      scene.setMode('base');
+      reels.show(baseGrid, baseLabels);
+    },
+  });
 }

@@ -1,21 +1,16 @@
 import type { HoldAndSpinResult } from '../../engine/features/holdAndSpin';
 import { HoldAndSpinScene } from '../../view/scenes/HoldAndSpinScene';
-import { sound } from '../../audio/sound';
-import { tween } from '../../view/tween';
+import { TRANSITION_COLORS } from '../../view/Transition';
 import type { PresentContext } from './context';
+import { presentOverlayBonus } from './overlayBonus';
 
-export async function presentHoldAndSpin(ctx: PresentContext, cash: HoldAndSpinResult): Promise<void> {
-  const { scene } = ctx;
-  scene.reels.highlight(cash.initialBags);
-  sound.play('bonus');
-  await scene.banner.show('CASH RUN!', `${cash.initialBags.length} CASH BAGS · HOLD & SPIN`, 1100);
-  scene.reels.clearWins();
-
-  const view = new HoldAndSpinScene(scene.layout, scene.textures.kingpin);
-  view.alpha = 0;
-  scene.overlay.addChild(view);
-  await tween(view, { alpha: 1 }, 300);
-  await view.play(cash, (amount) => ctx.addWin(amount));
-  await tween(view, { alpha: 0 }, 300);
-  view.destroy({ children: true });
+export function presentHoldAndSpin(ctx: PresentContext, cash: HoldAndSpinResult): Promise<void> {
+  return presentOverlayBonus(ctx, {
+    trigger: cash.initialBags,
+    colors: TRANSITION_COLORS.holdAndSpin,
+    title: 'CASH RUN',
+    sub: `${cash.initialBags.length} CASH BAGS · HOLD & SPIN`,
+    createView: () => new HoldAndSpinScene(ctx.scene.layout, ctx.scene.textures.kingpin),
+    play: (view) => view.play(cash, (amount) => ctx.addWin(amount)),
+  });
 }

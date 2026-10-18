@@ -172,7 +172,8 @@ export class LowriderHopScene extends Container {
       rungs[hop.level](true);
       const pop = new Text({ text: `+${fmt(hop.win)}`, style: textStyle(COLORS.gold, 72, { stroke: { color: COLORS.background, width: 8 } }) });
       pop.anchor.set(0.5);
-      pop.position.set(car.x, car.y - 300 - height);
+      // Above the car, but never over the hop counter.
+      pop.position.set(car.x, Math.max(hopsText.y + 90, car.y - 300 - height));
       this.addChild(pop);
       total += hop.win;
       totalText.text = `TOTAL ${fmt(total)}`;
