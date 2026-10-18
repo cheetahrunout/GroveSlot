@@ -2,6 +2,7 @@ import { Container, Graphics, Sprite, Text, type Texture } from 'pixi.js';
 import { CASH_RUN, JACKPOTS } from '../../config/features';
 import { REEL_COUNT, ROW_COUNT } from '../../config/reels';
 import type { CashBag, HoldAndSpinResult } from '../../engine/features/holdAndSpin';
+import { sound } from '../../audio/sound';
 import { bagLabel, fmt } from '../format';
 import type { Layout } from '../layout';
 import { createCashBagView } from '../SymbolView';
@@ -85,6 +86,7 @@ export class HoldAndSpinScene extends Container {
     const view = createCashBagView(CELL, bagLabel(bag));
     cell.addChild(view);
     if (pop) {
+      sound.play('coin');
       view.pivot.set(CELL / 2);
       view.position.set(CELL / 2);
       view.scale.set(0.2);
@@ -184,6 +186,7 @@ export class HoldAndSpinScene extends Container {
     panel.position.set(W / 2, H / 2 - 100);
     panel.scale.set(0.2);
     this.addChild(panel);
+    sound.play('bigWin');
     await tween(panel, { 'scale.x': 1, 'scale.y': 1 }, 600, easeOutBack);
     await wait(2500);
     panel.destroy({ children: true });

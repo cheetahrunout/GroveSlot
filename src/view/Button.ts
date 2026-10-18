@@ -1,4 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js';
+import { sound } from '../audio/sound';
 import { COLORS, textStyle } from './theme';
 
 export interface ButtonOptions {
@@ -28,7 +29,11 @@ export class Button extends Container {
     this.addChild(this.bg, this.caption);
     this.eventMode = 'static';
     this.cursor = 'pointer';
-    this.on('pointertap', () => this.enabled && onTap());
+    this.on('pointertap', () => {
+      if (!this.enabled) return;
+      sound.play('click');
+      onTap();
+    });
     this.on('pointerover', () => ((this.hovered = true), this.redraw()));
     this.on('pointerout', () => ((this.hovered = false), this.redraw()));
     this.redraw();

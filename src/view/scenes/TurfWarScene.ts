@@ -1,6 +1,7 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import { TURF_WAR, type WheelSlice } from '../../config/features';
 import type { TurfWarResult } from '../../engine/features/turfWar';
+import { sound } from '../../audio/sound';
 import { Button } from '../Button';
 import { fmt } from '../format';
 import type { Layout } from '../layout';
@@ -109,7 +110,16 @@ export class TurfWarScene extends Container {
     const theta = (slice + 0.5) * SLICE_ANGLE;
     const base = this.wheel.rotation + Math.PI * 6;
     const offset = (((-theta - base) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    // Ticks slow down with the wheel.
+    let ticking = true;
+    void (async () => {
+      for (let gap = 60; ticking && gap < 400; gap *= 1.12) {
+        sound.play('wheelTick');
+        await wait(gap);
+      }
+    })();
     await tween(this.wheel, { rotation: base + offset }, 2200, easeOutCubic);
+    ticking = false;
   }
 
   async play(result: TurfWarResult, auto: boolean, onWin: (amount: number) => void): Promise<void> {
@@ -142,12 +152,14 @@ export class TurfWarScene extends Container {
         void tween(block.name.parent!, { 'scale.x': 1, 'scale.y': 1 }, 400, easeOutBack);
         total += spin.win;
         onWin(spin.win);
+        sound.play('cheer');
         this.status.text = `${TURF_WAR.territories[i]} TAKEN! +${fmt(spin.win)}`;
       } else if (spin.outcome === 'backup') {
         this.status.text = 'BACKUP! YOUR HOMIES GOT YOUR BACK';
       } else if (spin.outcome === 'blocked') {
         this.status.text = 'BACKUP HELD THE BALLAS OFF';
       } else {
+        sound.play('siren');
         this.status.text = 'THE BALLAS PUSHED YOU BACK';
         this.status.style.fill = '#c58cf0';
       }

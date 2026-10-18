@@ -1,11 +1,13 @@
 import type { LowriderHopResult } from '../../engine/features/lowriderHop';
 import { LowriderHopScene } from '../../view/scenes/LowriderHopScene';
+import { sound } from '../../audio/sound';
 import { tween } from '../../view/tween';
 import type { PresentContext } from './context';
 
 export async function presentLowriderHop(ctx: PresentContext, hop: LowriderHopResult): Promise<void> {
   const { scene } = ctx;
   scene.reels.highlight(findLowriders(scene.reels.currentGrid));
+  sound.play('bonus');
   await scene.banner.show('LOWRIDER HOP!', 'Three lowriders in the hood', 1100);
   scene.reels.clearWins();
 

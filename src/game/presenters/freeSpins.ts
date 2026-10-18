@@ -1,6 +1,7 @@
 import { FREE_SPINS } from '../../config/features';
 import { FREE_SPIN_REELS } from '../../config/reels';
 import type { FreeSpinsResult } from '../../engine/features/freeSpins';
+import { sound } from '../../audio/sound';
 import { wait } from '../../view/tween';
 import { fmt, type PresentContext } from './context';
 
@@ -10,6 +11,7 @@ export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult)
   const baseGrid = reels.currentGrid.map((c) => [...c]);
   const baseLabels = reels.currentLabels;
 
+  sound.play('bonus');
   await banner.show('FREE SPINS!', `${fs.initialSpins} GROVE STREET FREE SPINS`, 1300);
   scene.setMode('freeSpins');
   let multiplier = 1;
@@ -25,6 +27,7 @@ export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult)
 
     if (spin.evaluation.scatterCount > 0) {
       reels.highlight(spin.evaluation.scatterPositions);
+      sound.play('spray');
       bar.update(i + 1, totalSoFar, spin.multiplier, spin.tags, false);
       await wait(600);
       reels.clearWins();
@@ -39,6 +42,7 @@ export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult)
       multiplier = fs.spins[i + 1]?.multiplier ?? fs.finalMultiplier;
       bar.update(i + 1, totalSoFar, multiplier, spin.tags, multiplier >= FREE_SPINS.maxMultiplier);
       void bar.pulseMultiplier();
+      sound.play('cheer');
       const levelSpins = spin.addedSpins - (spin.retriggered ? FREE_SPINS.retrigger : 0);
       await banner.show(`x${multiplier} MULTIPLIER`, `HOOD TAGGED · +${levelSpins} SPINS`, 900);
     }

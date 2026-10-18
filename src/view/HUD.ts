@@ -100,6 +100,7 @@ export class HUD {
     this.spin.setEnabled(!busy);
     this.betDown.setEnabled(!busy);
     this.betUp.setEnabled(!busy);
+    this.menu.setEnabled(!busy);
     if (busy) this.autoMenu.visible = false;
   }
 }

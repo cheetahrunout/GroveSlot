@@ -1,5 +1,6 @@
 import type { TurfWarResult } from '../../engine/features/turfWar';
 import { TurfWarScene } from '../../view/scenes/TurfWarScene';
+import { sound } from '../../audio/sound';
 import { tween } from '../../view/tween';
 import type { PresentContext } from './context';
 
@@ -10,8 +11,10 @@ export async function presentTurfWar(ctx: PresentContext, turf: TurfWarResult): 
       column.flatMap((s, row) => (s === 'TURF' ? [{ reel, row }] : [])),
     );
     scene.reels.highlight(palms);
-    await scene.banner.show('TURF WAR!', 'Three Palm G on the block', 1100);
+    sound.play('bonus');
+  await scene.banner.show('TURF WAR!', 'Three Palm G on the block', 1100);
   } else {
+    sound.play('siren');
     await scene.banner.show('TURF WAR!', 'The Ballas rolled up on you', 1100, '#c58cf0');
   }
   scene.reels.clearWins();

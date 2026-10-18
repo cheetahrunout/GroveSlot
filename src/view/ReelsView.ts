@@ -5,6 +5,7 @@ import type { SymbolId } from '../config/symbols';
 import type { Evaluation, Position } from '../engine/evaluate';
 import type { Grid } from '../engine/spin';
 import type { GameTextures } from './assets';
+import { sound } from '../audio/sound';
 import { createLowrider } from './art/lowrider';
 import { createSymbolView } from './SymbolView';
 import { COLORS, LINE_COLORS, textStyle } from './theme';
@@ -100,9 +101,12 @@ export class ReelsView extends Container {
     car.scale.set(0.75);
     car.position.set(-500, GRID_HEIGHT / 2 + 80);
     this.overlay.addChild(car);
+    sound.play('skid');
     for (let reel = 0; reel < REEL_COUNT; reel++) {
       await tween(car, { x: reel * STEP + CELL / 2 }, reel === 0 ? 500 : 260, linear);
-      for (const p of positions.filter((q) => q.reel === reel)) void this.expandCell(p.reel, p.row);
+      const hits = positions.filter((q) => q.reel === reel);
+      if (hits.length > 0) sound.play('spray');
+      for (const p of hits) void this.expandCell(p.reel, p.row);
     }
     await tween(car, { x: GRID_WIDTH + 500 }, 500, linear);
     car.destroy({ children: true });
@@ -148,6 +152,7 @@ export class ReelsView extends Container {
     labels = new Map<string, string>(),
   ): Promise<void> {
     this.clearWins();
+    sound.play('spin');
     const previousLabels = this.labels;
     this.labels = labels;
     const spins = target.map(async (column, reel) => {
@@ -178,6 +183,7 @@ export class ReelsView extends Container {
       container.y = -(symbols.length - 1 - ROW_COUNT) * STEP;
       const duration = turbo ? 350 + reel * 90 : 900 + reel * 260;
       await tween(container, { y: BOUNCE }, duration, easeOutCubic);
+      sound.play('reelStop');
       await tween(container, { y: 0 }, 160, easeOutBack);
       this.fillReel(reel, column);
     });
@@ -249,6 +255,7 @@ export class ReelsView extends Container {
     if (total.length === 0) return;
 
     this.highlight(total);
+    sound.play('win');
     for (const w of result.lineWins) this.overlay.addChild(this.drawLine(w.line, w.count));
     await wait(900);
 

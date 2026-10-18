@@ -1,7 +1,8 @@
 import '@fontsource/anton/400.css';
 import '@fontsource/permanent-marker/400.css';
-import { Assets, Rectangle, Texture } from 'pixi.js';
+import { Assets, Rectangle, Texture, type Renderer } from 'pixi.js';
 import type { SymbolId } from '../config/symbols';
+import { ART_SIZE, DRAWN_SYMBOLS, drawSymbolArt } from './art/symbols';
 
 const SYMBOL_ART: Partial<Record<SymbolId, string>> = {
   WILD: 'assets/symbols/wild-trident-g.jpg',
@@ -26,7 +27,7 @@ function cropSquare(tex: Texture): Texture {
   });
 }
 
-export async function loadAssets(): Promise<GameTextures> {
+export async function loadAssets(renderer: Renderer): Promise<GameTextures> {
   await Promise.all([
     document.fonts.load('40px Anton'),
     document.fonts.load('40px "Permanent Marker"'),
@@ -38,6 +39,12 @@ export async function loadAssets(): Promise<GameTextures> {
   const symbols: Partial<Record<SymbolId, Texture>> = {};
   for (const [sym, url] of Object.entries(SYMBOL_ART) as [SymbolId, string][]) {
     symbols[sym] = cropSquare(loaded[url]);
+  }
+  // Bake the drawn symbols into textures once; reels reuse them constantly.
+  for (const sym of DRAWN_SYMBOLS) {
+    const art = drawSymbolArt(sym);
+    symbols[sym] = renderer.generateTexture({ target: art, frame: new Rectangle(0, 0, ART_SIZE, ART_SIZE), resolution: 2 });
+    art.destroy({ children: true });
   }
   return { symbols, kingpin: cropSquare(loaded[EXTRA_ART.kingpin]) };
 }

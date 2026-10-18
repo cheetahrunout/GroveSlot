@@ -9,6 +9,8 @@ import type { Rng } from '../engine/rng';
 import { INITIAL_STATE, playRound, type FeatureKey, type GameState, type RoundResult } from '../engine/round';
 import { spinReels } from '../engine/spin';
 import type { LeaderboardService } from '../leaderboard/leaderboard';
+import { sound } from '../audio/sound';
+import { bigWinTier, showBigWin } from '../view/BigWin';
 import { showDialog } from '../view/Dialog';
 import { bagLabels } from '../view/format';
 import type { GameScene } from '../view/GameScene';
@@ -66,6 +68,8 @@ export class GameController {
   attach(scene: GameScene): void {
     this.scene = scene;
     scene.applySkin(this.progress.settings.skin);
+    sound.setSfx(this.progress.settings.sound);
+    sound.setMusic(this.progress.settings.music);
     scene.reels.show(spinReels(this.rng, BASE_REELS).grid);
     this.refreshHud();
     scene.hud.win.setValue('—');
@@ -192,6 +196,8 @@ export class GameController {
     if (patch.skin && !this.progress.isSkinUnlocked(patch.skin)) delete patch.skin;
     this.progress.updateSettings(patch);
     if (patch.skin) this.scene.applySkin(patch.skin);
+    if (patch.sound !== undefined) sound.setSfx(patch.sound);
+    if (patch.music !== undefined) sound.setMusic(patch.music);
     if (patch.gamble === false) this.setGambleOffer(0);
   }
 
@@ -312,6 +318,10 @@ export class GameController {
       await this.presentFeatures(result);
       if (result.capped) await scene.banner.show('MAX WIN', `Capped at ${fmt(result.totalWin)}`, 1500);
       scene.hud.win.setValue(result.totalWin > 0 ? fmt(result.totalWin) : '—');
+      if (bigWinTier(result.totalWin, result.totalBet) >= 0) {
+        scene.reels.clearWins();
+        await showBigWin(scene.overlay, scene.layout, result.totalWin, result.totalBet);
+      }
 
       if (result.totalWin > 0) {
         await countUp(shownBalance, wallet.balance, Math.min(1200, 300 + result.totalWin), (v) => scene.hud.balance.setValue(fmt(v)));

@@ -26,11 +26,12 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 |---|---|---|
 | Build | **Vite + TypeScript** | Fast dev loop, simple static deploy |
 | Rendering | **PixiJS v8** | WebGL sprites, smooth reel spins, particles |
-| Animation | GSAP (or Pixi ticker tweens) | Reel easing, win celebrations |
-| Audio | **Howler.js** | Sprite sheets, mobile-safe unlock |
+| Animation | Small promise-based tween helper on the Pixi ticker (`src/view/tween.ts`) | Reel easing, win celebrations, turbo speed-up |
+| Audio | **Web Audio API** synth (`src/audio/sound.ts`) | Every sound and the music loop are generated in code: no audio files, nothing borrowed |
 | State | Small typed store (no framework) or Zustand | Game state machine is simple |
 | Persistence | `localStorage` (try/catch, versioned schema) | Tokens, stats, settings |
 | Tests | **Vitest** | Math, payouts and state machine |
+| Fonts | Anton + Permanent Marker via `@fontsource` (bundled) | Graffiti look, works offline |
 | Deploy | GitHub Pages / any static host | No backend needed |
 
 ---
@@ -240,7 +241,7 @@ Prep before use:
 | 8 | **Turf War + Drive-By + Wanted Level** ✅ | Turf War wheel (prizes, Backup, Ballas) and Los Santos map with Turf Boss; Drive-By car spraying 1–3 wilds; Wanted stars with a guaranteed 5× payday; total RTP ≈ 97% before final tuning |
 | 9 | **Gamble** ✅ | GAMBLE ×2 button after a win (not during auto-spin): pick the left or right alley, 50/50 escape or bust, up to 5 rounds and 10× the win, COLLECT any time |
 | 10 | **Economy polish** ✅ | Daily allowance and broke rescue pop-ups, stats, 11 achievements with toasts, 3 unlockable reel skins, local leaderboard (big wins, multipliers, territories), MENU with pays/stats/trophies/leaders/settings; wins are saved the moment a round is decided |
-| 11 | **Art and audio pass** | Replace placeholders, big-win celebrations, music |
+| 11 | **Art and audio pass** ✅ | Original vector art for every remaining symbol (OG, Sabre, house, chain, boombox, BMX, ball, cap, spray can, lowrider, graffiti letters) baked to textures; big-win screen (Nice → Respect → Big Smoke-sized → Kingpin) with coins; synthesised sound effects and a G-funk-style music loop, both switchable in Settings |
 | 12 | **QA and release** | Mobile layout, performance, re-run the simulator after all features, deploy to GitHub Pages |
 
 After every feature milestone, re-run the simulator and keep the total RTP inside 95–97%.

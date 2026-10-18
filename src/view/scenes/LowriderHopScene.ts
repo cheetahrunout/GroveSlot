@@ -2,6 +2,7 @@ import { Container, Graphics, Rectangle, Text } from 'pixi.js';
 import { LOWRIDER_HOP } from '../../config/features';
 import type { LowriderHopResult } from '../../engine/features/lowriderHop';
 import { createLowrider } from '../art/lowrider';
+import { sound } from '../../audio/sound';
 import { Button } from '../Button';
 import type { Layout } from '../layout';
 import { COLORS, FONT_TAG, textStyle } from '../theme';
@@ -165,6 +166,7 @@ export class LowriderHopScene extends Container {
       hopButton.setEnabled(false);
 
       const height = (hop.level + 1) * HOP_STEP;
+      sound.play('hop');
       await tween(body, { y: 18 }, 140, easeInOutQuad); // squat
       await tween(body, { y: -height }, 260 + hop.level * 40, easeOutCubic);
       rungs[hop.level](true);

@@ -2,6 +2,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import { GAMBLE } from '../../config/features';
 import { canGamble, type Alley } from '../../engine/features/gamble';
 import { createLowrider } from '../art/lowrider';
+import { sound } from '../../audio/sound';
 import { Button } from '../Button';
 import { fmt } from '../format';
 import type { Layout } from '../layout';
@@ -115,11 +116,13 @@ export class CarChaseScene extends Container {
       round++;
       const target = this.alleyX[choice === 'left' ? 0 : 1];
       car.scale.x = choice === 'left' ? -0.8 : 0.8;
+      sound.play('skid');
       await tween(car, { x: target }, 700, easeInOutQuad);
       if (outcome.won) {
         await tween(car, { alpha: 0, 'scale.y': 0.4 }, 300);
         resultText.style.fill = COLORS.groveLight;
         resultText.text = 'ESCAPED!';
+        sound.play('cheer');
         stake = outcome.stake;
         await wait(900);
         car.alpha = 1;
@@ -135,6 +138,7 @@ export class CarChaseScene extends Container {
         await tween(cop, { alpha: 1 }, 250);
         resultText.style.fill = '#ff5a3c';
         resultText.text = 'BUSTED!';
+        sound.play('siren');
         stake = 0;
         stakeText.text = 'STAKE LOST';
         await wait(1600);

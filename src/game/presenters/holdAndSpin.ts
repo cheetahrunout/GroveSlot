@@ -1,11 +1,13 @@
 import type { HoldAndSpinResult } from '../../engine/features/holdAndSpin';
 import { HoldAndSpinScene } from '../../view/scenes/HoldAndSpinScene';
+import { sound } from '../../audio/sound';
 import { tween } from '../../view/tween';
 import type { PresentContext } from './context';
 
 export async function presentHoldAndSpin(ctx: PresentContext, cash: HoldAndSpinResult): Promise<void> {
   const { scene } = ctx;
   scene.reels.highlight(cash.initialBags);
+  sound.play('bonus');
   await scene.banner.show('CASH RUN!', `${cash.initialBags.length} CASH BAGS · HOLD & SPIN`, 1100);
   scene.reels.clearWins();
 
