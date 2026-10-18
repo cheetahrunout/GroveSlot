@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { inject, onBeforeUnmount, onMounted, ref } from 'vue';
+import { inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import ActionBar from './components/ActionBar.vue';
+import CasinoBar from './components/CasinoBar.vue';
 import GameHeader from './components/GameHeader.vue';
 import GameHud from './components/GameHud.vue';
 import MenuPanel from './components/MenuPanel.vue';
@@ -19,7 +20,8 @@ const stage = ref<HTMLElement | null>(null);
 function arrange(): void {
   if (!stage.value) return;
   const r = stage.value.getBoundingClientRect();
-  scene.arrange({ width: window.innerWidth, height: window.innerHeight }, { x: r.left, y: r.top, width: r.width, height: r.height });
+  // The casino bar takes the bottom of the window; the game gets the rest.
+  scene.arrange({ width: window.innerWidth, height: window.innerHeight }, { x: r.left, y: r.top, width: r.width, height: r.height }, store.barHeight);
 }
 
 function onKey(e: KeyboardEvent): void {
@@ -33,6 +35,14 @@ function onKey(e: KeyboardEvent): void {
 }
 
 let observer: ResizeObserver | null = null;
+watch(
+  () => store.barHeight,
+  (h) => {
+    document.documentElement.style.setProperty('--bar-h', `${h}px`);
+    void nextTick(arrange);
+  },
+);
+
 onMounted(() => {
   observer = new ResizeObserver(arrange);
   if (stage.value) observer.observe(stage.value);
@@ -48,7 +58,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="layout">
+  <main class="layout" :style="{ bottom: `${store.barHeight}px` }">
     <GameHeader class="top" :class="{ away: store.mode === 'bonus' }" />
     <div ref="stage" class="stage" aria-hidden="true"></div>
     <GameHud class="bottom" :class="{ away: store.mode === 'bonus' }" />
@@ -58,6 +68,7 @@ onBeforeUnmount(() => {
   <ToastStack />
   <MenuPanel v-if="store.menuOpen" />
   <StatusOverlay />
+  <CasinoBar v-if="store.casinoUrl" />
 </template>
 
 <style scoped>

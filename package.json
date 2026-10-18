@@ -10,10 +10,10 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter @lowrider/server --filter @lowrider/web run dev",
-    "typecheck": "pnpm -r run typecheck",
+    "typecheck": "pnpm -r run typecheck && tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:e2e": "pnpm --filter @lowrider/web run test:e2e",
+    "test:e2e": "playwright test",
     "build": "pnpm -r run build",
     "start": "pnpm --filter @lowrider/server run start",
     "sim": "pnpm --filter @lowrider/shared run sim",
@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
+    "@playwright/test": "1.63.0",
     "@types/node": "24.19.1",
     "eslint": "9.39.5",
     "eslint-plugin-vue": "10.11.1",

@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { INITIAL_STATE, type GameState } from '@lowrider/shared/engine/round';
 
-export type RoundStatus = 'opening' | 'open' | 'settled' | 'voided' | 'refused' | 'closed_by_casino';
+export type RoundStatus = 'opening' | 'open' | 'settled' | 'voided' | 'refunded' | 'refused' | 'closed_by_casino';
 
 /**
  * Game state only, never money: which rounds this server started and how

@@ -6,9 +6,11 @@ import { z } from 'zod';
  * types are shared so both sides agree on the shape.
  */
 
-export const GAME_STATUSES = ['live', 'last_bets', 'halted', 'maintenance'] as const;
-export const GameStatusSchema = z.enum(GAME_STATUSES);
-export type GameStatus = z.infer<typeof GameStatusSchema>;
+/** The casino's four control states. */
+export const CASINO_STATUSES = ['live', 'last_bets', 'halted', 'maintenance'] as const;
+export const CasinoStatusSchema = z.enum(CASINO_STATUSES);
+/** Plus `offline`: the casino has not answered our heartbeats for 90 s, so no new rounds. */
+export type GameStatus = z.infer<typeof CasinoStatusSchema> | 'offline';
 
 export const FORCEABLE = ['freeSpins', 'lowriderHop', 'holdAndSpin', 'turfWar', 'driveBy'] as const;
 
@@ -27,16 +29,16 @@ export const SpinRequestSchema = z
 export const GambleRequestSchema = z.object({ pick: z.enum(['left', 'right']) }).strict();
 
 /** POST /api/dev/control (local play only): switch the stand-in casino's state. */
-export const DevControlRequestSchema = z.object({ status: GameStatusSchema, reason: z.string().max(200).optional() }).strict();
+export const DevControlRequestSchema = z.object({ status: CasinoStatusSchema, reason: z.string().max(200).optional() }).strict();
 
 export type SessionRequest = z.infer<typeof SessionRequestSchema>;
 export type SpinRequest = z.infer<typeof SpinRequestSchema>;
 export type GambleRequest = z.infer<typeof GambleRequestSchema>;
 
-/** A player's balance as the casino reports it. */
+/** The player's casino tokens: micro-tokens (6 decimals) and their euro value at the current rate. */
 export interface Balance {
-  value: number;
-  unit: 'cents' | 'tokens';
+  tokensMicro: number;
+  valueCents: number;
 }
 
 export interface Limits {
@@ -59,14 +61,25 @@ export interface PublicState {
 }
 
 export interface Welcome {
-  lobbyUrl: string;
+  /** The casino (CASINO_PUBLIC_URL): the lobby link, the casino bar and the theme. Empty in local play. */
+  casinoUrl: string;
+  /** Where a player without a session goes: the casino logs them in and sends them back with a token. */
+  playUrl: string;
+  /** The game's slug at the casino (casino-game.json), for the casino bar. */
+  slug: string;
   dev: boolean;
   state: PublicState;
 }
 
+/** SSE `control` event. */
 export interface ControlEvent {
   status: GameStatus;
   reason: string;
+}
+
+/** SSE `balance` event: the player's tokens changed (a round, a top-up, another game). */
+export interface BalanceEvent {
+  balance: Balance;
 }
 
 /** Error answer: `{error, code}` plus the balance on 402. */

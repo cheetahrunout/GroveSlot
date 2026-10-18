@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { CASINO_PORT } from '../playwright.config';
 
 test('health answers with the running version', async ({ request }) => {
   const res = await request.get('/health');
@@ -9,11 +10,17 @@ test('health answers with the running version', async ({ request }) => {
 test('the page loads, spins once and settles', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // The Content-Security-Policy must not block anything the page needs.
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
 
   await page.goto('/');
   const hud = page.getByRole('region', { name: 'Game controls' });
   const balance = hud.locator('.balance .value');
-  await expect(balance).toHaveText(/€/, { timeout: 30_000 });
+  // Tokens, four decimals, Dutch style (the euro value sits next to it).
+  await expect(balance).toHaveText(/^[\d.]+,\d{4} tok$/, { timeout: 30_000 });
+  await expect(hud.locator('.balance .worth')).toHaveText(/^worth €\s[\d.]+,\d{2}$/);
   const before = await balance.textContent();
 
   const spin = page.getByRole('button', { name: 'Spin' });
@@ -29,4 +36,17 @@ test('the page loads, spins once and settles', async ({ page }) => {
   }).toPass({ timeout: 100_000 });
 
   expect(errors).toEqual([]);
+});
+
+test('a visitor without a session is sent through the casino to sign in', async ({ page }) => {
+  const toCasino = page.waitForRequest((req) => req.url() === 'http://127.0.0.1:9/play/lowrider');
+  await page.goto(`http://127.0.0.1:${CASINO_PORT}/`).catch(() => undefined);
+  await toCasino;
+});
+
+test('the page runs under a strict Content-Security-Policy', async ({ request }) => {
+  const res = await request.get('/');
+  const csp = res.headers()['content-security-policy'];
+  expect(csp).toContain("script-src 'self'");
+  expect(csp).not.toContain('unsafe-eval');
 });

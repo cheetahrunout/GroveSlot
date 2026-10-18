@@ -54,8 +54,12 @@ export class GameScene extends Container {
     this.backdrop.clear().rect(0, 0, this.viewport.width, this.viewport.height).fill(color);
   }
 
-  /** `viewport` is the canvas size and `stage` the free area for the reels, both in CSS pixels. */
-  arrange(viewport: { width: number; height: number }, stage: StageRect): void {
+  /**
+   * `viewport` is the canvas size and `stage` the free area for the reels, both
+   * in CSS pixels. `reservedBottom` is covered by the casino bar: the backdrop
+   * still paints it, the bonus scenes stay above it.
+   */
+  arrange(viewport: { width: number; height: number }, stage: StageRect, reservedBottom = 0): void {
     this.viewport = viewport;
     this.drawBackdrop();
 
@@ -69,7 +73,7 @@ export class GameScene extends Container {
     );
 
     // Bonus scenes and effects work in a fixed design resolution, letterboxed.
-    this.layout = computeLayout(viewport.width, viewport.height);
+    this.layout = computeLayout(viewport.width, Math.max(1, viewport.height - reservedBottom));
     this.designRoot.scale.set(this.layout.scale);
     this.designRoot.position.set(this.layout.offsetX, this.layout.offsetY);
     // Announcements sit over the reels.

@@ -16,6 +16,26 @@ describe('casino-game.json', () => {
     expect(BET_LADDER_CENTS).toContain(manifest.max_bet_cents);
     expect(manifest.multiplayer).toBe(false);
     expect(manifest.health_url).toBe('/health');
+    expect(manifest.currency).toBe('euro');
+    expect(manifest.repository).toMatch(/^https:\/\/github\.com\/[^/]+\/[^/]+$/);
+  });
+
+  it('has a build ledger the casino can read (rule 14)', () => {
+    const lines = readFileSync(new URL('../../../build-cost.jsonl', import.meta.url), 'utf8')
+      .split('\n')
+      .map((l) => l.trim())
+      .filter((l) => l && !l.startsWith('#'));
+    expect(lines.length).toBeGreaterThan(0);
+    const ids = new Set<string>();
+    for (const line of lines) {
+      const e = JSON.parse(line);
+      expect(e).toMatchObject({ id: expect.any(String), date: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), model: expect.any(String), note: expect.any(String) });
+      for (const k of ['input_tokens', 'output_tokens', 'cache_write_tokens', 'cache_read_tokens']) {
+        expect(Number.isInteger(e[k] ?? 0)).toBe(true);
+      }
+      expect(ids.has(e.id)).toBe(false);
+      ids.add(e.id);
+    }
   });
 
   it('declares an RTP in the slot band that the game delivers', () => {

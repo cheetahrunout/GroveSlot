@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
-    "build": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/server.mjs --packages=external --alias:@lowrider/shared=../../packages/shared/src --log-level=warning",
+    "build": "esbuild src/main.ts --bundle --platform=node --target=node24 --format=esm --outfile=dist/server.mjs --packages=external --alias:@lowrider/shared=../../packages/shared/src --banner:js=\"import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\" --log-level=warning",
     "start": "node dist/server.mjs",
     "typecheck": "tsc --noEmit",
     "odds": "tsx tools/odds-check.ts"

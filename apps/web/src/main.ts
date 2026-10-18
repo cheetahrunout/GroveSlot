@@ -1,6 +1,8 @@
 import '@fontsource/anton/400.css';
 import '@fontsource/permanent-marker/400.css';
 import './styles/base.css';
+// Pixi without eval: the page runs under a Content-Security-Policy without 'unsafe-eval'.
+import 'pixi.js/unsafe-eval';
 import { Application } from 'pixi.js';
 import { createPinia } from 'pinia';
 import { createApp } from 'vue';

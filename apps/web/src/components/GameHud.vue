@@ -2,7 +2,7 @@
 import { inject, ref } from 'vue';
 import { CONTROLLER } from '../game/injection';
 import { useGameStore } from '../stores/game';
-import { euro, money } from '../view/format';
+import { euro, tokens } from '../view/format';
 
 const AUTO_OPTIONS = [10, 25, 50, 100] as const;
 const store = useGameStore();
@@ -24,7 +24,11 @@ function startAuto(n: number): void {
   <section class="hud" aria-label="Game controls">
     <div class="box balance g-panel">
       <span class="caption">BALANCE</span>
-      <span class="value" aria-live="polite">{{ money(store.balance) }}</span>
+      <template v-if="store.balance">
+        <span class="value" aria-live="polite">{{ tokens(store.balance.tokensMicro) }}</span>
+        <span class="worth">worth {{ euro(store.balance.valueCents) }}</span>
+      </template>
+      <span v-else class="value">—</span>
     </div>
 
     <div class="box bet g-panel">
@@ -106,6 +110,13 @@ function startAuto(n: number): void {
 .value {
   font-size: clamp(18px, 3.6vmin, 42px);
   color: var(--grove-color-gold);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.worth {
+  font-size: clamp(10px, 1.5vmin, 16px);
+  color: var(--grove-color-muted);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

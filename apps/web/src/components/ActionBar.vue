@@ -38,7 +38,7 @@ watch(
 .action-bar {
   position: fixed;
   left: 50%;
-  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--bar-h, 0px) + max(16px, env(safe-area-inset-bottom, 0px)));
   transform: translateX(-50%);
   z-index: 3;
   display: grid;

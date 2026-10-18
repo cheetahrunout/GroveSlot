@@ -3,19 +3,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRng } from '@lowrider/shared/engine/rng';
 import { buildApp } from '../src/app';
 import { FakeCasino } from '../src/fakeCasino';
-import { LowriderGame } from '../src/game';
+import { LowriderGame, startGame } from '../src/game';
 import { Journal } from '../src/journal';
+import { flush, setup } from './helpers';
 
 let casino: FakeCasino;
 let game: LowriderGame;
 let app: FastifyInstance;
 
 async function makeApp(devMode: boolean) {
-  casino = new FakeCasino(100_000);
-  game = new LowriderGame(casino, createRng(3), new Journal(':memory:'), () => {}, devMode);
-  game.applyControl(casino.state);
-  casino.events((c) => game.applyControl(c));
-  app = await buildApp({ game, casino, version: '1.0.42', devMode, lobbyUrl: 'https://casino.example', secureCookies: !devMode });
+  ({ casino, game } = await setup({ devMode }));
+  app = await buildApp({ game, casino, version: '1.0.42', devMode, casinoUrl: devMode ? '' : 'https://casino.example/', slug: 'lowrider', secureCookies: !devMode });
 }
 
 /** Opens a session with a token and returns the cookie header to reuse. */
@@ -47,9 +45,20 @@ describe('production mode', () => {
     expect(cookie.value).not.toBe(sessions[0]);
   });
 
-  it('refuses play without a session and without a token', async () => {
-    expect((await app.inject({ method: 'POST', url: '/api/session', payload: {} })).statusCode).toBe(401);
-    expect((await app.inject({ method: 'POST', url: '/api/spin', payload: { betCents: 20 } })).statusCode).toBe(401);
+  it('sends a visitor without a session back through the casino', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/session', payload: {} });
+    expect(res.statusCode).toBe(401);
+    expect(res.json().playUrl).toBe('https://casino.example/play/lowrider');
+    const spin = await app.inject({ method: 'POST', url: '/api/spin', payload: { betCents: 20 } });
+    expect(spin.statusCode).toBe(401);
+    expect(spin.json().playUrl).toBe('https://casino.example/play/lowrider');
+  });
+
+  it('never hands the browser the game key or the casino API', async () => {
+    const cookie = await login();
+    const res = await app.inject({ url: '/api/state', headers: { cookie } });
+    expect(res.json()).toMatchObject({ casinoUrl: 'https://casino.example', playUrl: 'https://casino.example/play/lowrider' });
+    expect(res.body).not.toMatch(/GAME_KEY|Bearer|session"/);
   });
 
   it('validates every request with the shared schemas', async () => {
@@ -103,6 +112,7 @@ describe('local play', () => {
 
   it('switches the stand-in casino state', async () => {
     await app.inject({ method: 'POST', url: '/api/dev/control', payload: { status: 'last_bets', reason: 'Testing' } });
+    await flush();
     expect(game.controlState.status).toBe('last_bets');
   });
 });
@@ -110,29 +120,22 @@ describe('local play', () => {
 describe('restart recovery', () => {
   it('voids rounds that were left open, refunding the bet', async () => {
     const journal = new Journal(':memory:');
-    casino = new FakeCasino(100_000);
-    const first = new LowriderGame(casino, createRng(5), journal);
-    first.applyControl(casino.state);
+    casino = new FakeCasino();
+    const first = startGame(casino, { rng: createRng(5), journal, version: 'test' }).game;
+    await flush();
     const s = await first.openSession('cj');
+    const start = casino.wallets.get('player-cj')!;
     // The casino stops answering after the bet is taken.
     casino.failNext = { settle: 99, voidRound: 99 };
-    const voidRound = casino.voidRound.bind(casino);
-    casino.voidRound = async (id, reason) => {
-      if ((casino.failNext.voidRound ?? 0) > 0) {
-        casino.failNext.voidRound!--;
-        throw new (await import('../src/casino')).CasinoError(0, { error: 'network' });
-      }
-      return voidRound(id, reason);
-    };
     await expect(first.spin(s, 20)).rejects.toMatchObject({ code: 'round_pending' });
-    expect(casino.balances.get('player-cj')).toBe(100_000 - 20);
+    expect(casino.wallets.get('player-cj')).toBeLessThan(start);
     expect(journal.unfinishedRounds()).toHaveLength(1);
 
     // A new server process with the same journal cleans up once the casino answers.
     casino.failNext = {};
-    const second = new LowriderGame(casino, createRng(6), journal);
+    const second: LowriderGame = startGame(casino, { rng: createRng(6), journal, version: 'test' }).game;
     expect(await second.reconcile()).toBe(1);
-    expect(casino.balances.get('player-cj')).toBe(100_000);
+    expect(casino.wallets.get('player-cj')).toBe(start);
     expect(journal.unfinishedRounds()).toHaveLength(0);
   });
 

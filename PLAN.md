@@ -22,12 +22,14 @@ The game is called **Lowrider** (the project and repository stay GroveSlot). A b
 
 ## Grove Casino integration (current architecture)
 
-Lowrider now runs as a Grove Casino game under the casino's contract (GAMES.md). That replaced parts of the original plan below:
+Lowrider now runs as a Grove Casino game under the casino's integration guide (`game-integration.md`, which absorbed GAMES.md and the technology standard). That replaced parts of the original plan below:
 - **The server decides everything.** `server/` is a Node game server that runs the engine with `crypto.randomInt`. The page is a thin client that sends intentions and plays back confirmed results.
 - **The casino holds the money.** The wallet, daily allowance, broke rescue and Kingpin pot were removed. Each spin and each Car Chase pick is a casino round (open → decide → settle, void on failure). Bets are euro cents within the casino's limits.
 - **No rerolls.** The Wanted Level's "guaranteed win" (which re-spun until it won) became a Payday prize drawn from a table.
 - **Control states, heartbeat, health, scores.** The casino's leaderboard replaces the local one.
 - Manifest `casino-game.json` (RTP 96.00%), Dockerfile and a GHCR image workflow. GitHub Pages hosting was dropped, because the page needs the server.
+- **The casino SDK and money on screen.** The server uses `sdk/casino-game.js` verbatim (calls, `watch()`, `rng`), handles `offline` and refunded rounds, and sends players without a session back through `/play/lowrider`. The page embeds the casino bar, shows tokens (four decimals, rounded down) with their euro value, writes euro Dutch style, follows the casino theme and runs under a CSP. `build-cost.jsonl` is the build ledger.
+- **RTP re-measured.** 40 million CSPRNG rounds showed the game paying about 95.1%, under the declared 96%: free spins delivered about a point under budget. The Wanted Payday table moved from an 8.4× to a 9.48× mean (6× to 28×), which measured 96.06% (±0.22) over 40 million rounds.
 - **Grove game technology standard.** The repo is a pnpm workspace (`apps/web`, `apps/server`, `packages/shared`): Vue 3 + Pinia own the HUD, menus and bonus prompts; PixiJS owns the canvas; Fastify + Zod + SQLite (round references and Wanted levels only) on Node 24 own the game. CI is the standard `build.yml` (numbered GHCR images `1.0.<n>`). The tables and trees in §2 and §6 below are updated to match.
 
 ## 2. Tech stack
@@ -163,25 +165,27 @@ Lowrider now runs as a Grove Casino game under the casino's contract (GAMES.md).
 ```
 apps/
   server/src/
-    main.ts               # env, casino client, journal, heartbeat, control refresh, shutdown
+    main.ts               # env, casino (SDK or stub), journal, watch(), housekeeping, SIGTERM drain
     app.ts                # Fastify: /health, JSON API, SSE events, cookies, rate limits, static page
     game.ts               # LowriderGame: sessions, spin/gamble/collect as casino rounds, reconcile
-    casino.ts             # HTTP casino client (round open/settle/void, control, heartbeat, score)
-    fakeCasino.ts         # stand-in casino for local play and tests
+    casino/               # the casino SDK (casino-game.js + .d.ts, verbatim) and small helpers around it
+    fakeCasino.ts         # stub casino with the SDK's interface, for local play and tests
     journal.ts            # SQLite: round references + per-player Wanted level
-    rng.ts                # crypto.randomInt
+    rng.ts                # the engine's Rng on top of the SDK's rng (crypto.randomInt)
   web/src/
     main.ts               # Pixi app + Vue app + Pinia, wires the controller
-    App.vue, components/  # header, HUD, action bar (bonus prompts), menu, status screens, toasts
+    App.vue, components/  # header, HUD, action bar (bonus prompts), menu, status screens, toasts, casino bar
     stores/game.ts        # Pinia UI state
-    design/tokens.ts      # Grove tokens → CSS variables
+    design/tokens.ts      # Grove tokens → CSS variables, following the casino theme
     game/                 # GameController, API client, presenters that play each bonus back
     view/                 # Pixi scene: reels, transitions, big win, bonus scenes, art
 packages/shared/src/
   config/                 # symbols, paylines, paytable, reel strips, bonus settings, RTP budget
   engine/                 # pure TS round logic (playRound, evaluate, features/*), run by the server
   api.ts                  # Zod request schemas + response types shared by server and page
+e2e/                      # Playwright smoke tests
 casino-game.json          # manifest
+build-cost.jsonl          # build ledger
 ```
 
 **Key rule:** the server decides every outcome **before** the animation starts (and the casino settles it straight away), and the page only plays it back. That keeps the math testable and lets the simulator run without rendering.

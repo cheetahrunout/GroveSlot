@@ -1,6 +1,6 @@
 import type { Alley } from '@lowrider/shared/engine/features/gamble';
 import type { FeatureKey, RoundResult } from '@lowrider/shared/engine/round';
-import type { ControlEvent, PublicState, Welcome } from '@lowrider/shared/api';
+import type { BalanceEvent, ControlEvent, PublicState, Welcome } from '@lowrider/shared/api';
 
 export type { PublicState, Welcome };
 
@@ -50,16 +50,19 @@ export const api = {
     call<{ escape: Alley; won: boolean; stake: number; canContinue: boolean; state: PublicState }>('POST', '/api/gamble', { pick }),
   collect: () => call<{ state: PublicState }>('POST', '/api/collect', {}),
   leave: () => navigator.sendBeacon?.('/api/leave'),
-  /** Live control state (live, last bets, halted, maintenance). */
-  events: (onControl: (c: ControlEvent) => void): EventSource => {
+  /** Live control state (live, last bets, halted, maintenance, offline) and the player's balance. */
+  events: (onControl: (c: ControlEvent) => void, onBalance: (b: BalanceEvent) => void): EventSource => {
     const source = new EventSource('/api/events');
-    source.addEventListener('control', (e) => {
-      try {
-        onControl(JSON.parse((e as MessageEvent).data));
-      } catch {
-        // Ignore a malformed event; the next one corrects it.
-      }
-    });
+    const listen = <T>(type: string, handler: (data: T) => void) =>
+      source.addEventListener(type, (e) => {
+        try {
+          handler(JSON.parse((e as MessageEvent).data) as T);
+        } catch {
+          // Ignore a malformed event; the next one corrects it.
+        }
+      });
+    listen('control', onControl);
+    listen('balance', onBalance);
     return source;
   },
 };

@@ -10,6 +10,7 @@ import {
   GambleRequestSchema,
   SessionRequestSchema,
   SpinRequestSchema,
+  type BalanceEvent,
   type ControlEvent,
   type Welcome,
 } from '@lowrider/shared/api';
@@ -24,8 +25,10 @@ export interface AppOptions {
   version: string;
   /** Local play with the stand-in casino: allows forced bonuses and /api/dev/control. */
   devMode: boolean;
-  /** Link back to the casino lobby (CASINO_PUBLIC_URL). */
-  lobbyUrl: string;
+  /** The casino's public address (CASINO_PUBLIC_URL): lobby link, casino bar, theme. Empty in local play. */
+  casinoUrl: string;
+  /** The game's slug, for CASINO_PUBLIC_URL/play/<slug>. */
+  slug: string;
   /** The production Vite build to serve; skipped when missing. */
   webDir?: string;
   /** Mark cookies Secure (always outside local play). */
@@ -70,14 +73,39 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     return s;
   };
 
-  const welcome = (s: PlayerSession | null): Welcome => ({ lobbyUrl: opts.lobbyUrl, dev: devMode, state: game.publicState(s) });
+  const casinoUrl = opts.casinoUrl.replace(/\/+$/, '');
+  // No session (or the casino ended it): the casino logs the player in and comes back with a fresh token.
+  const playUrl = casinoUrl ? `${casinoUrl}/play/${opts.slug}` : '';
+  const welcome = (s: PlayerSession | null): Welcome => ({ casinoUrl, playUrl, slug: opts.slug, dev: devMode, state: game.publicState(s) });
 
   const setSessionCookie = (reply: FastifyReply, id: string) =>
     reply.setCookie(COOKIE, id, { path: '/', httpOnly: true, sameSite: 'lax', secure: opts.secureCookies, maxAge: COOKIE_MAX_AGE });
 
+  // The page may load only itself, plus the casino's theme and bar (and the fonts a theme imports).
+  const casinoOrigin = casinoUrl ? new URL(casinoUrl).origin : '';
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    `style-src 'self' 'unsafe-inline' ${casinoOrigin} https://fonts.googleapis.com`.trim(),
+    "font-src 'self' data: https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "worker-src 'self' blob:",
+    `frame-src ${casinoOrigin || "'none'"}`,
+    "frame-ancestors 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+  ].join('; ');
+  app.addHook('onSend', async (_req, reply, payload) => {
+    reply.header('Content-Security-Policy', csp);
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    return payload;
+  });
+
   app.setErrorHandler((error, _req, reply) => {
     if (error instanceof GameError) {
-      reply.code(error.status).send({ error: error.message, code: error.code, balance: error.balance });
+      reply.code(error.status).send({ error: error.message, code: error.code, balance: error.balance, ...(error.status === 401 ? { playUrl } : {}) });
       return;
     }
     const status = (error as { statusCode?: number }).statusCode;
@@ -140,21 +168,24 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     return { ok: true };
   });
 
-  /** Server-sent events: the casino's control state, as it changes. */
+  /** Server-sent events: the casino's control state, and this player's balance, as they change. */
   app.get('/api/events', (req, reply) => {
+    const sessionId = req.cookies[COOKIE];
     reply.hijack();
     const res = reply.raw;
     res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
-    const push = (c: { status: ControlEvent['status']; reason: string }) => {
-      const event: ControlEvent = { status: c.status, reason: c.reason };
-      res.write(`event: control\ndata: ${JSON.stringify(event)}\n\n`);
-    };
-    push(game.controlState);
-    const stop = game.onControl(push);
+    const send = (type: string, data: unknown) => res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`);
+    const pushControl = (c: { status: ControlEvent['status']; reason: string }) => send('control', { status: c.status, reason: c.reason } satisfies ControlEvent);
+    pushControl(game.controlState);
+    const stopControl = game.onControl(pushControl);
+    const stopBalance = game.onBalance((id, balance) => {
+      if (id === sessionId) send('balance', { balance } satisfies BalanceEvent);
+    });
     const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
     req.raw.on('close', () => {
       clearInterval(ping);
-      stop();
+      stopControl();
+      stopBalance();
     });
   });
 

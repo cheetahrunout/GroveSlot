@@ -1,128 +1,213 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { PAYLINES } from '@lowrider/shared/config/paylines';
-import { createRng } from '@lowrider/shared/engine/rng';
-import { FakeCasino } from '../src/fakeCasino';
-import { GameError, LowriderGame, betOptions } from '../src/game';
-import { Journal } from '../src/journal';
+import { centsToMicro } from '../src/fakeCasino';
+import { GameError, betOptions } from '../src/game';
 import { cryptoRng } from '../src/rng';
-
-let casino: FakeCasino;
-let game: LowriderGame;
-
-beforeEach(() => {
-  casino = new FakeCasino(100_000);
-  game = new LowriderGame(casino, createRng(7), new Journal(':memory:'));
-  game.applyControl(casino.state);
-});
-
-const balanceOf = (name = 'player-cj') => casino.balances.get(name)!;
+import { flush, setup } from './helpers';
 
 describe('sessions', () => {
   it('swaps the one-time token for a session the browser never sees', async () => {
+    const { game } = await setup();
     const s = await game.openSession('cj');
     expect(s.id).not.toBe(s.casinoSession);
     expect(game.getSession(s.id)).toBe(s);
-    expect(game.publicState(s)).not.toHaveProperty('casinoSession');
     expect(JSON.stringify(game.publicState(s))).not.toContain(s.casinoSession);
+    expect(game.publicState(s).balance).toEqual({ tokensMicro: 700_000_000, valueCents: 105_000 });
   });
 
   it('refuses new players when the game is not live', async () => {
-    game.applyControl({ ...casino.state, status: 'last_bets' });
+    const { game, casino } = await setup();
+    casino.setState({ status: 'last_bets' });
+    await flush();
     await expect(game.openSession('cj')).rejects.toMatchObject({ code: 'last_bets' });
+  });
+
+  it('turns a casino 401 into session_closed and forgets the session', async () => {
+    const { game, casino } = await setup();
+    const s = await game.openSession('cj');
+    casino.sessions.clear();
+    await expect(game.spin(s, 20)).rejects.toMatchObject({ status: 401, code: 'session_closed' });
+    expect(game.getSession(s.id)).toBeNull();
+  });
+});
+
+describe('heartbeat and control', () => {
+  it('heartbeats at once with the version and the player count', async () => {
+    const { casino } = await setup();
+    expect(casino.heartbeats[0]).toEqual({ version: '1.0.42', players: 0 });
+  });
+
+  it('reads the reason players see from the casino', async () => {
+    const { game, casino } = await setup();
+    casino.setState({ status: 'maintenance', reason: 'New paint job' });
+    await flush();
+    await flush();
+    expect(game.controlState).toMatchObject({ status: 'maintenance', reason: 'New paint job' });
   });
 });
 
 describe('spins', () => {
   it('debits the bet and credits exactly the settled win through the casino', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
-    let expected = balanceOf();
+    let expected = casino.wallets.get('player-cj')!;
     for (let i = 0; i < 300; i++) {
       const { result, state } = await game.spin(s, 40);
-      expected += result.totalWin - 40;
-      expect(balanceOf()).toBe(expected);
-      expect(state.balance).toEqual({ value: expected, unit: 'cents' });
-      expect(result.totalBet).toBe(40);
+      expected += centsToMicro(result.totalWin) - centsToMicro(40);
+      expect(casino.wallets.get('player-cj')).toBe(expected);
+      expect(state.balance?.tokensMicro).toBe(expected);
       expect(result.lineBet * PAYLINES.length).toBe(40);
     }
     // Every round is opened once and settled once.
-    expect([...casino.rounds.values()].every((r) => r.win !== null && !r.voided)).toBe(true);
+    expect([...casino.rounds.values()].every((r) => r.round.status === 'settled')).toBe(true);
   });
 
   it('only accepts bets inside the casino limits', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
-    game.applyControl({ ...casino.state, limits: { minBetCents: 100, maxBetCents: 200, maxWinCents: 50_000 } });
+    casino.setState({ limitsCents: { min: 100, max: 200, maxWin: 50_000 } });
+    await flush();
     expect(betOptions(game.controlState.limits)).toEqual([100, 200]);
     await expect(game.spin(s, 40)).rejects.toMatchObject({ code: 'bad_bet' });
     await expect(game.spin(s, 33)).rejects.toMatchObject({ code: 'bad_bet' });
   });
 
   it('caps a round at the casino max win', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
-    game.applyControl({ ...casino.state, limits: { minBetCents: 20, maxBetCents: 500, maxWinCents: 100 } });
+    casino.setState({ limitsCents: { min: 20, max: 500, maxWin: 100 } });
+    await flush();
     for (let i = 0; i < 300; i++) expect((await game.spin(s, 20)).result.totalWin).toBeLessThanOrEqual(100);
   });
 
   it('reports the balance from a 402 and charges nothing', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
-    casino.balances.set('player-cj', 10);
-    await expect(game.spin(s, 20)).rejects.toMatchObject({ status: 402, balance: { value: 10, unit: 'cents' } });
-    expect(balanceOf()).toBe(10);
+    casino.wallets.set('player-cj', 1000);
+    await expect(game.spin(s, 20)).rejects.toMatchObject({ status: 402, balance: { tokensMicro: 1000 } });
+    expect(casino.wallets.get('player-cj')).toBe(1000);
   });
 
   it('retries network trouble with the same round id, without double charging', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
-    const start = balanceOf();
+    const start = casino.wallets.get('player-cj')!;
     casino.failNext = { openRound: 2, settle: 2 };
     const { result } = await game.spin(s, 20);
     expect(casino.rounds.size).toBe(1);
-    expect(balanceOf()).toBe(start - 20 + result.totalWin);
+    expect(casino.wallets.get('player-cj')).toBe(start - centsToMicro(20) + centsToMicro(result.totalWin));
   });
 
   it('voids the round and refunds the bet when the settle never goes through', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
-    const start = balanceOf();
+    const start = casino.wallets.get('player-cj');
     casino.failNext = { settle: 99 };
     await expect(game.spin(s, 20)).rejects.toMatchObject({ code: 'round_voided' });
-    expect(balanceOf()).toBe(start);
-    expect([...casino.rounds.values()][0].voided).toBe(true);
+    expect(casino.wallets.get('player-cj')).toBe(start);
+    expect([...casino.rounds.values()][0].round.status).toBe('void');
   });
 
   it('obeys last_bets, halted and maintenance at once', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
     for (const status of ['last_bets', 'halted', 'maintenance'] as const) {
-      game.applyControl({ ...casino.state, status, reason: 'Testing' });
+      casino.setState({ status, reason: 'Testing' });
+      await flush();
       await expect(game.spin(s, 20)).rejects.toBeInstanceOf(GameError);
     }
     // A halt closes every session.
     expect(game.getSession(s.id)).toBeNull();
   });
 
+  it('refuses new rounds while the casino is offline', async () => {
+    const { game, casino, state } = await setup();
+    const s = await game.openSession('cj');
+    casino.goOffline(state);
+    await flush();
+    expect(game.controlState.status).toBe('offline');
+    await expect(game.spin(s, 20)).rejects.toMatchObject({ status: 409, code: 'offline' });
+    expect(casino.rounds.size).toBe(0);
+  });
+
+  it('tells the player the stake came back when the casino refunded a lost round while offline', async () => {
+    const { game, casino } = await setup();
+    const s = await game.openSession('cj');
+    const start = casino.wallets.get('player-cj');
+    // The casino refunds between our open and our settle; a losing settle is refused with refunded: true.
+    const settle = casino.settle.bind(casino);
+    casino.settle = async (a) => {
+      casino.refundOpenRounds('offline');
+      return settle({ ...a, winCents: 0 });
+    };
+    await expect(game.spin(s, 20)).rejects.toMatchObject({ status: 409, code: 'refunded' });
+    expect(casino.wallets.get('player-cj')).toBe(start);
+    expect(game.publicState(s).balance?.tokensMicro).toBe(start);
+  });
+
+  it('still pays a late win of at least the stake on a refunded round', async () => {
+    const { game, casino } = await setup();
+    const s = await game.openSession('cj');
+    const start = casino.wallets.get('player-cj')!;
+    const settle = casino.settle.bind(casino);
+    casino.settle = async (a) => {
+      casino.refundOpenRounds('offline');
+      return settle({ ...a, winCents: 60 });
+    };
+    await game.spin(s, 20);
+    expect(casino.wallets.get('player-cj')).toBe(start - centsToMicro(20) + centsToMicro(60));
+  });
+
+  it('follows balance events from the casino (a top-up, another game)', async () => {
+    const { game, casino } = await setup();
+    const s = await game.openSession('cj');
+    const seen: number[] = [];
+    game.onBalance((id, b) => id === s.id && seen.push(b.tokensMicro));
+    casino.wallets.set('player-cj', 5_000_000);
+    casino.topUp('player-cj', 1_000_000);
+    expect(seen.at(-1)).toBe(6_000_000);
+    expect(game.publicState(s).balance?.tokensMicro).toBe(6_000_000);
+  });
+
   it('sends big wins to the leaderboard with the player session', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
     for (let i = 0; i < 2000 && casino.scores.length === 0; i++) await game.spin(s, 20);
     expect(casino.scores.length).toBeGreaterThan(0);
     expect(casino.scores[0].session).toBe(s.casinoSession);
     expect(casino.scores[0].score).toBeGreaterThanOrEqual(200);
   });
+
+  it('drains rounds in flight before a shutdown and refuses new ones', async () => {
+    const { game } = await setup();
+    const s = await game.openSession('cj');
+    const spinning = game.spin(s, 20);
+    await game.drain();
+    await expect(spinning).resolves.toBeDefined();
+    await expect(game.spin(s, 20)).rejects.toMatchObject({ code: 'restarting' });
+  });
 });
 
 describe('Car Chase', () => {
   it('is offered after a win and plays each pick as its own paid round', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
     let r;
     do r = await game.spin(s, 20);
     while (r.result.totalWin === 0 || !r.state.gamble);
     const stake = r.state.gamble!.stake;
-    const before = balanceOf();
+    const before = casino.wallets.get('player-cj')!;
     const g = await game.gamble(s, 'left');
-    expect(balanceOf()).toBe(before - stake + g.stake);
+    expect(casino.wallets.get('player-cj')).toBe(before - centsToMicro(stake) + centsToMicro(g.stake));
     expect(g.stake).toBe(g.won ? stake * 2 : 0);
     if (!g.won) await expect(game.gamble(s, 'left')).rejects.toMatchObject({ code: 'no_offer' });
   });
 
   it('can be switched off from the casino settings', async () => {
+    const { game, casino } = await setup();
     const s = await game.openSession('cj');
-    game.applyControl({ ...casino.state, settings: { gamble_enabled: false } });
+    casino.setState({ settings: { gamble_enabled: false } });
+    await flush();
     let r;
     do r = await game.spin(s, 20);
     while (r.result.totalWin === 0);

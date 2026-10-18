@@ -1,0 +1,4 @@
+{
+  "//": "The casino SDK (casino-game.js, copied verbatim from the casino repository) is CommonJS.",
+  "type": "commonjs"
+}

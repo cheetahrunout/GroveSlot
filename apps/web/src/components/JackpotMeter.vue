@@ -19,7 +19,8 @@ const store = useGameStore();
 <style scoped>
 .jackpots {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* The Kingpin also carries its crown. */
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.5fr);
   gap: var(--hud-gap);
   margin: 0;
   padding: 0;
@@ -68,5 +69,6 @@ const store = useGameStore();
   font-size: clamp(16px, 2.8vmin, 32px);
   color: var(--grove-color-gold);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 </style>

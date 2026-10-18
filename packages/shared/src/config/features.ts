@@ -106,14 +106,14 @@ export const WANTED = {
   /**
    * At max stars the next spin also pays a Payday prize drawn from this
    * table (× total bet), on top of whatever the spin wins. Drawn, never
-   * re-spun. Mean ≈ 8.4× bet.
+   * re-spun. Mean 9.48× bet.
    */
   payday: [
-    { multiplier: 5, weight: 40 },
-    { multiplier: 8, weight: 30 },
-    { multiplier: 10, weight: 18 },
-    { multiplier: 15, weight: 8 },
-    { multiplier: 25, weight: 4 },
+    { multiplier: 6, weight: 40 },
+    { multiplier: 9, weight: 30 },
+    { multiplier: 11, weight: 18 },
+    { multiplier: 16, weight: 8 },
+    { multiplier: 28, weight: 4 },
   ],
 } as const;
 
@@ -129,10 +129,10 @@ export const GAMBLE = {
  */
 export const RTP_BUDGET = {
   /** Line and scatter pays, including Drive-By wilds. */
-  base: 0.54,
-  wantedPayday: 0.04,
-  freeSpins: 0.2,
-  lowriderHop: 0.07,
-  holdAndSpin: 0.07,
-  turfWar: 0.04,
+  base: 0.538,
+  wantedPayday: 0.05,
+  freeSpins: 0.193,
+  lowriderHop: 0.069,
+  holdAndSpin: 0.072,
+  turfWar: 0.038,
 } as const;

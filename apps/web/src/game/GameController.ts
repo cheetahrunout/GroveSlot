@@ -14,6 +14,7 @@ import { CarChaseScene } from '../view/scenes/CarChaseScene';
 import { COLORS } from '../view/theme';
 import { TRANSITION_COLORS, playTransition } from '../view/Transition';
 import { timing, wait } from '../view/tween';
+import { linkCasinoTheme } from '../design/tokens';
 import { ApiError, api } from './api';
 import type { PresentContext } from './presenters/context';
 import { presentFreeSpins } from './presenters/freeSpins';
@@ -82,14 +83,19 @@ export class GameController {
     }
     try {
       const welcome = await api.openSession(token);
-      store.lobbyUrl = welcome.lobbyUrl;
+      store.casinoUrl = welcome.casinoUrl;
+      store.playUrl = welcome.playUrl;
+      store.slug = welcome.slug;
       store.hasSession = true;
+      linkCasinoTheme(welcome.casinoUrl);
       this.applyState(welcome.state);
     } catch (e) {
       const body = e instanceof ApiError ? e.body : {};
-      store.lobbyUrl = typeof body.lobbyUrl === 'string' ? body.lobbyUrl : '';
+      store.casinoUrl = typeof body.casinoUrl === 'string' ? body.casinoUrl : '';
+      store.playUrl = typeof body.playUrl === 'string' ? body.playUrl : '';
       if (body.state) this.applyState(body.state as PublicState);
-      if (!(e instanceof ApiError) || e.status !== 401) this.showError(e);
+      if (this.rejoin(e)) return;
+      this.showError(e);
     }
     store.connected = true;
 
@@ -104,6 +110,9 @@ export class GameController {
         store.gambleOffer = null;
       }
       if (reopened && store.hasSession) void api.state().then((w) => this.applyState(w.state), () => undefined);
+    }, ({ balance }) => {
+      // A round, a top-up in another tab or another game moved the player's tokens.
+      store.balance = balance;
     });
     window.addEventListener('pagehide', () => api.leave());
   }
@@ -123,9 +132,25 @@ export class GameController {
     }
   }
 
+  /**
+   * No session, or the casino ended it (idle, a halt, a ban): back through the
+   * casino, which signs the player in if needed and sends them back with a token.
+   */
+  private rejoin(e: unknown): boolean {
+    if (!(e instanceof ApiError) || e.status !== 401) return false;
+    this.store.hasSession = false;
+    this.stopAuto();
+    const playUrl = typeof e.body.playUrl === 'string' && e.body.playUrl ? e.body.playUrl : this.store.playUrl;
+    if (playUrl) window.location.replace(playUrl);
+    return true;
+  }
+
   private showError(e: unknown): void {
+    if (this.rejoin(e)) return;
     const message = e instanceof Error ? e.message : 'Something went wrong.';
-    void this.scene.banner.show('HOLD UP', message, 2200, COLORS.danger);
+    // The casino refunded the stake while it could not hear the game: no result, the bet came back.
+    const refunded = e instanceof ApiError && e.code === 'refunded';
+    void this.scene.banner.show(refunded ? 'STAKE RETURNED' : 'HOLD UP', message, refunded ? 3200 : 2200, refunded ? COLORS.gold : COLORS.danger);
   }
 
   // --- controls --------------------------------------------------------------

@@ -1,11 +1,11 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { GAMBLE } from '@lowrider/shared/config/features';
 import { PAYLINES } from '@lowrider/shared/config/paylines';
 import { canGamble, playGamble, type Alley } from '@lowrider/shared/engine/features/gamble';
 import type { Rng } from '@lowrider/shared/engine/rng';
 import { playRound, type FeatureKey, type RoundResult } from '@lowrider/shared/engine/round';
-import type { Balance, Limits, PublicState } from '@lowrider/shared/api';
-import { CasinoError, DEFAULT_LIMITS, type Casino, type ControlState } from './casino';
+import type { Balance, GameStatus, Limits, PublicState } from '@lowrider/shared/api';
+import { CasinoError, errorData, retryable, rng as casinoRng, toBalance, toLimits, type Casino, type Player, type WatchState } from './casino';
 import type { Journal } from './journal';
 
 /** Total bets offered (euro cents), filtered by the casino's current limits. */
@@ -21,6 +21,16 @@ const SCORE_MIN_MULTIPLIER = 10;
 const SESSION_IDLE_MS = 12 * 60 * 60 * 1000;
 /** Players seen within this window count towards the heartbeat. */
 const ACTIVE_MS = 5 * 60 * 1000;
+/** How often the status reason and the token rate are re-read from the casino. */
+const CONTROL_REFRESH_MS = 5 * 60 * 1000;
+
+/** What the page needs to know about the control state. */
+export interface ControlView {
+  status: GameStatus;
+  reason: string;
+  limits: Limits;
+  settings: Record<string, unknown>;
+}
 
 /** A refusal or failure to show the player. */
 export class GameError extends Error {
@@ -46,10 +56,13 @@ export interface PlayerSession {
   casinoSession: string;
   player: { id: string; name: string };
   lastSeen: number;
+  expiresAt: number;
   busy: boolean;
   gamble: GambleOffer | null;
   balance: Balance | null;
 }
+
+type BalanceListener = (sessionId: string, balance: Balance) => void;
 
 
 type Log = (event: string, fields?: Record<string, unknown>) => void;
@@ -60,41 +73,64 @@ type Log = (event: string, fields?: Record<string, unknown>) => void;
  * remembers game state (Wanted stars, the open gamble offer).
  */
 export class LowriderGame {
-  private control: ControlState = {
-    status: 'maintenance',
-    reason: 'Starting up',
-    settings: {},
-    limits: { ...DEFAULT_LIMITS },
-    rtpBps: null,
-  };
   private readonly sessions = new Map<string, PlayerSession>();
-  private readonly listeners = new Set<(c: ControlState) => void>();
+  private readonly listeners = new Set<(c: ControlView) => void>();
+  private readonly balanceListeners = new Set<BalanceListener>();
+  private view: ControlView;
+  private reason = '';
+  private rateMicro: number | null = null;
+  private controlReadAt = 0;
+  private stopping = false;
 
   constructor(
     private readonly casino: Casino,
+    /** Kept current by casino.watch(): status (or 'offline'), settings and limits. */
+    private readonly state: WatchState,
     private readonly rng: Rng,
     /** Round references and Wanted stars (game state only), for restarts. */
     private readonly journal: Journal,
     private readonly log: Log = () => {},
     /** Local development with the stand-in casino: allows forcing bonuses. */
     private readonly devMode = false,
-  ) {}
+  ) {
+    this.view = this.readView();
+  }
 
   // --- control state -------------------------------------------------------
 
-  get controlState(): ControlState {
-    return this.control;
+  private readView(): ControlView {
+    const status = this.state.status;
+    const reason = status === 'offline' ? 'The casino is not answering. Spins are paused until it is back.' : status === 'live' ? '' : this.reason;
+    return { status, reason, limits: toLimits(this.state.limits), settings: this.state.settings ?? {} };
   }
 
-  onControl(listener: (c: ControlState) => void): () => void {
+  get controlState(): ControlView {
+    return this.view;
+  }
+
+  onControl(listener: (c: ControlView) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  applyControl(next: ControlState): void {
-    const before = this.control.status;
-    this.control = next;
-    if (next.status !== before) this.log('control', { status: next.status });
+  onBalance(listener: BalanceListener): () => void {
+    this.balanceListeners.add(listener);
+    return () => this.balanceListeners.delete(listener);
+  }
+
+  /**
+   * Picks up what casino.watch() changed in the shared state (the stream,
+   * heartbeat answers, or 'offline' after 90 s of silence) and acts on it at once.
+   */
+  syncControl(): void {
+    const next = this.readView();
+    const before = this.view;
+    if (JSON.stringify(next) === JSON.stringify(before)) return;
+    this.view = next;
+    if (next.status !== before.status) {
+      this.log('control', { status: next.status });
+      if (next.status !== 'live' && next.status !== 'offline') void this.refreshControl(true);
+    }
     if (next.status === 'halted' || next.status === 'maintenance') {
       // The casino has refunded open rounds and closed every session.
       this.sessions.clear();
@@ -103,8 +139,57 @@ export class LowriderGame {
     for (const l of this.listeners) l(next);
   }
 
+  /** Reads the reason players see and the token rate (the SDK's watch state keeps neither). */
+  async refreshControl(force = false, now = Date.now()): Promise<void> {
+    if (!force && now - this.controlReadAt < CONTROL_REFRESH_MS) return;
+    this.controlReadAt = now;
+    try {
+      const c = await this.casino.control();
+      this.reason = c.status_reason ?? '';
+      if (c.rate_micro && c.rate_micro !== this.rateMicro) {
+        this.rateMicro = c.rate_micro;
+        // The euro value of a token balance moves with the rate.
+        for (const s of this.sessions.values()) {
+          if (!s.balance) continue;
+          s.balance = { ...s.balance, valueCents: Math.floor((s.balance.tokensMicro * c.rate_micro) / 1e10) };
+          this.emitBalance(s);
+        }
+      }
+      const reasonChanged = this.readView().reason !== this.view.reason;
+      if (reasonChanged) {
+        this.view = this.readView();
+        for (const l of this.listeners) l(this.view);
+      }
+    } catch (e) {
+      this.log('control_failed', { error: (e as Error).message });
+    }
+  }
+
+  /** A `balance` event from the casino's stream: a round, a top-up or another game moved the player's tokens. */
+  onCasinoEvent(type: string, data: unknown): void {
+    if (type !== 'balance' || !data || typeof data !== 'object') return;
+    const { session, player } = data as { session?: string; player?: Player };
+    if (!session || !player) return;
+    for (const s of this.sessions.values()) {
+      if (s.casinoSession !== session) continue;
+      s.balance = toBalance(player);
+      this.emitBalance(s);
+    }
+  }
+
+  private emitBalance(s: PlayerSession): void {
+    if (!s.balance) return;
+    for (const l of this.balanceListeners) l(s.id, s.balance);
+  }
+
+  private setPlayer(s: PlayerSession, player: Player | undefined): void {
+    if (!player) return;
+    s.balance = toBalance(player);
+    this.emitBalance(s);
+  }
+
   private get gambleEnabled(): boolean {
-    return this.control.settings.gamble_enabled !== false;
+    return this.view.settings.gamble_enabled !== false;
   }
 
   activePlayers(now = Date.now()): number {
@@ -113,29 +198,42 @@ export class LowriderGame {
     return n;
   }
 
+  /** SIGTERM: refuse new rounds, then wait for the ones in flight to settle or void. */
+  async drain(timeoutMs = 20_000): Promise<void> {
+    this.stopping = true;
+    const until = Date.now() + timeoutMs;
+    while ([...this.sessions.values()].some((s) => s.busy) && Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+
   // --- sessions ------------------------------------------------------------
 
   async openSession(token: string): Promise<PlayerSession> {
-    if (this.control.status !== 'live') {
-      throw new GameError(409, this.control.status, this.control.reason || 'Lowrider is closed right now.');
+    if (this.view.status !== 'live') {
+      throw new GameError(409, this.view.status, this.view.reason || 'Lowrider is closed right now.');
     }
     let opened;
     try {
       opened = await this.casino.openSession(token);
     } catch (e) {
       if (e instanceof CasinoError && e.status === 401) {
-        throw new GameError(401, 'bad_token', 'This link has expired. Open Lowrider again from the casino lobby.');
+        throw new GameError(401, 'session_closed', 'This link has expired. Back to the casino for a fresh one.');
+      }
+      if (e instanceof CasinoError && e.status === 409) {
+        throw new GameError(409, String(errorData(e).game_status ?? 'refused'), 'Lowrider is closed right now.');
       }
       throw e;
     }
     const s: PlayerSession = {
       id: randomBytes(24).toString('hex'),
       casinoSession: opened.session,
-      player: opened.player,
+      player: { id: String(opened.player.id), name: opened.player.username },
       lastSeen: Date.now(),
+      expiresAt: opened.expires_ts > 0 ? opened.expires_ts : Date.now() + SESSION_IDLE_MS,
       busy: false,
       gamble: null,
-      balance: opened.balance,
+      balance: toBalance(opened.player),
     };
     this.sessions.set(s.id, s);
     this.log('session_open');
@@ -146,7 +244,7 @@ export class LowriderGame {
     if (!id) return null;
     const s = this.sessions.get(id);
     if (!s) return null;
-    if (now - s.lastSeen > SESSION_IDLE_MS) {
+    if (now - s.lastSeen > SESSION_IDLE_MS || now > s.expiresAt) {
       this.sessions.delete(id);
       return null;
     }
@@ -164,10 +262,10 @@ export class LowriderGame {
 
   publicState(s: PlayerSession | null): PublicState {
     return {
-      status: this.control.status,
-      reason: this.control.reason,
-      betOptions: betOptions(this.control.limits),
-      limits: this.control.limits,
+      status: this.view.status,
+      reason: this.view.reason,
+      betOptions: betOptions(this.view.limits),
+      limits: this.view.limits,
       gambleEnabled: this.gambleEnabled,
       player: s ? { name: s.player.name } : null,
       balance: s?.balance ?? null,
@@ -179,7 +277,8 @@ export class LowriderGame {
   // --- rounds --------------------------------------------------------------
 
   private requireLive(): void {
-    const { status, reason } = this.control;
+    if (this.stopping) throw new GameError(503, 'restarting', 'Lowrider is restarting. Try again in a moment.');
+    const { status, reason } = this.view;
     if (status === 'live') return;
     const message =
       status === 'last_bets'
@@ -194,7 +293,7 @@ export class LowriderGame {
       try {
         return await task();
       } catch (e) {
-        if (!(e instanceof CasinoError) || !e.retryable || attempt >= tries) throw e;
+        if (!retryable(e) || attempt >= tries) throw e;
         await new Promise((r) => setTimeout(r, 250 * 2 ** (attempt - 1)));
       }
     }
@@ -202,23 +301,20 @@ export class LowriderGame {
 
   private refusal(e: unknown, s: PlayerSession): never {
     if (e instanceof CasinoError) {
+      const data = errorData(e);
       if (e.status === 402) {
-        const raw = e.body;
-        const balance =
-          typeof raw.balance_cents === 'number'
-            ? ({ value: raw.balance_cents, unit: 'cents' } as const)
-            : typeof raw.balance === 'number'
-              ? ({ value: raw.balance, unit: 'tokens' } as const)
-              : null;
-        if (balance) s.balance = balance;
-        throw new GameError(402, 'cannot_afford', 'Your balance does not cover this bet.', balance);
+        if (typeof data.balance === 'number' && s.balance) {
+          const micro = data.balance;
+          s.balance = { tokensMicro: micro, valueCents: this.rateMicro ? Math.floor((micro * this.rateMicro) / 1e10) : s.balance.valueCents };
+        }
+        throw new GameError(402, 'cannot_afford', 'Your balance does not cover this bet. Top up from the casino bar.', s.balance);
       }
       if (e.status === 401) {
         this.sessions.delete(s.id);
-        throw new GameError(401, 'session_closed', 'Your session has ended. Open Lowrider again from the casino lobby.');
+        throw new GameError(401, 'session_closed', 'Your casino session has ended. Back to the casino to carry on.');
       }
       if (e.status === 409) {
-        throw new GameError(409, String(e.body.game_status ?? 'refused'), this.control.reason || 'The casino refused this round.');
+        throw new GameError(409, String(data.game_status ?? 'refused'), this.view.reason || 'The casino refused this round.');
       }
       if (e.status === 503) throw new GameError(503, 'maintenance', 'The casino is in maintenance.');
       if (e.status === 400) throw new GameError(400, 'bad_bet', 'That bet is outside the table limits.');
@@ -236,15 +332,16 @@ export class LowriderGame {
     meta: Record<string, unknown>,
     decide: () => { winCents: number; outcome: string; value: T },
   ): Promise<{ value: T; balance: Balance | null }> {
-    const round = randomUUID();
+    const round = casinoRng.id();
     const kind = String(meta.type);
     // Written before the casino is asked, so a crash at any point leaves a trace to clean up.
     this.journal.setRound(round, kind, 'opening');
     try {
-      await this.retry(() => this.casino.openRound({ session: s.casinoSession, round, betCents, meta }));
+      const opened = await this.retry(() => this.casino.openRound({ session: s.casinoSession, round, betCents, meta }));
       this.journal.setRound(round, kind, 'open');
+      this.setPlayer(s, opened.player);
     } catch (e) {
-      if (e instanceof CasinoError && !e.retryable) {
+      if (!retryable(e)) {
         this.journal.setRound(round, kind, 'refused');
         this.refusal(e, s);
       }
@@ -263,14 +360,21 @@ export class LowriderGame {
     }
 
     try {
-      const balance = await this.retry(() =>
+      const settled = await this.retry(() =>
         this.casino.settle({ round, winCents: decided.winCents, outcome: decided.outcome, meta }),
       );
       this.journal.setRound(round, kind, 'settled');
-      s.balance = balance ?? s.balance;
-      this.log('round', { kind, bet: betCents, win: decided.winCents, outcome: decided.outcome });
+      this.setPlayer(s, settled.player);
+      this.log('round', { kind, bet: betCents, win: decided.winCents, outcome: decided.outcome, ...(settled.late ? { late: true } : {}) });
       return { value: decided.value, balance: s.balance };
     } catch (e) {
+      if (e instanceof CasinoError && e.status === 409 && errorData(e).refunded) {
+        // The casino gave the stake back while it could not hear us; a loss stays a refund.
+        this.journal.setRound(round, kind, 'refunded');
+        this.log('round_refunded', { kind, bet: betCents });
+        await this.casino.session(s.casinoSession).then((r) => this.setPlayer(s, r.player)).catch(() => undefined);
+        throw new GameError(409, 'refunded', 'The casino gave your stake back while Lowrider was offline. This spin does not count.', s.balance);
+      }
       this.log('settle_failed', { error: (e as Error).message });
       // The win was never confirmed: refund the bet instead and say so.
       const voided = await this.voidAndRecord(round, kind, 'settle_failed');
@@ -287,11 +391,11 @@ export class LowriderGame {
   /** Voids a round; on success the journal marks it done, otherwise it stays for reconcile(). */
   private async voidAndRecord(round: string, kind: string, reason: string): Promise<boolean> {
     try {
-      await this.retry(() => this.casino.voidRound(round, reason));
+      await this.retry(() => this.casino.voidRound({ round, reason }));
       this.journal.setRound(round, kind, 'voided');
       return true;
     } catch (e) {
-      if (e instanceof CasinoError && !e.retryable) {
+      if (!retryable(e)) {
         // The casino knows this round as finished (settled, voided or never opened).
         this.journal.setRound(round, kind, 'closed_by_casino');
         return false;
@@ -317,7 +421,7 @@ export class LowriderGame {
 
   async spin(s: PlayerSession, totalBetCents: number, force?: FeatureKey | 'driveBy'): Promise<{ result: RoundResult; state: PublicState }> {
     this.requireLive();
-    if (!betOptions(this.control.limits).includes(totalBetCents)) {
+    if (!betOptions(this.view.limits).includes(totalBetCents)) {
       throw new GameError(400, 'bad_bet', 'That bet is outside the table limits.');
     }
     if (s.busy) throw new GameError(409, 'busy', 'A spin is already running.');
@@ -329,7 +433,7 @@ export class LowriderGame {
       let after = before;
       const { value: result } = await this.playPaidRound(s, totalBetCents, { type: 'spin' }, () => {
         const played = playRound(this.rng, before, lineBet, {
-          maxWin: this.control.limits.maxWinCents,
+          maxWin: this.view.limits.maxWinCents,
           force: this.devMode ? force : undefined,
         });
         after = played.state;
@@ -344,7 +448,7 @@ export class LowriderGame {
       }
       if (result.totalWin >= SCORE_MIN_MULTIPLIER * totalBetCents) {
         const multiplier = Math.round((result.totalWin / totalBetCents) * 10) / 10;
-        this.casino.score(s.casinoSession, result.totalWin, { multiplier, bet_cents: totalBetCents }).catch((e) =>
+        this.casino.score({ session: s.casinoSession, score: result.totalWin, meta: { multiplier, bet_cents: totalBetCents } }).catch((e) =>
           this.log('score_failed', { error: (e as Error).message }),
         );
       }
@@ -355,7 +459,7 @@ export class LowriderGame {
   }
 
   private stakeAllowed(stake: number): boolean {
-    const { minBetCents, maxBetCents } = this.control.limits;
+    const { minBetCents, maxBetCents } = this.view.limits;
     return stake >= minBetCents && stake <= maxBetCents;
   }
 
@@ -386,4 +490,35 @@ export class LowriderGame {
     s.gamble = null;
     return this.publicState(s);
   }
+}
+
+/**
+ * The state object casino.watch() keeps current (status, settings, limits).
+ * The game is told the moment anything changes, so a halt or `last_bets`
+ * applies at once.
+ */
+export function watchedState(onChange: () => void): WatchState {
+  return new Proxy<WatchState>(
+    { status: 'maintenance', settings: {}, limits: null },
+    {
+      set(target, key, value) {
+        Reflect.set(target, key, value);
+        queueMicrotask(onChange);
+        return true;
+      },
+    },
+  );
+}
+
+/** Wires a game to a casino: watch() with heartbeats (version, players) and balance events. */
+export function startGame(
+  casino: Casino,
+  opts: { rng: Rng; journal: Journal; log?: Log; devMode?: boolean; version: string },
+): { game: LowriderGame; state: WatchState; stop: () => void } {
+  let game: LowriderGame | null = null;
+  const state = watchedState(() => game?.syncControl());
+  const g = new LowriderGame(casino, state, opts.rng, opts.journal, opts.log, opts.devMode);
+  game = g;
+  const stop = casino.watch(state, () => ({ version: opts.version, players: g.activePlayers() }), (type, data) => g.onCasinoEvent(type, data));
+  return { game: g, state, stop };
 }

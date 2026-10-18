@@ -4,7 +4,11 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', '**/test-results/**', '**/playwright-report/**', 'lowrider.html'] },
+  {
+    ignores: ['**/dist/**', '**/node_modules/**', '**/test-results/**', '**/playwright-report/**', 'lowrider.html',
+      // The casino SDK, copied verbatim from the casino repository: never edited, so never linted.
+      'apps/server/src/casino/casino-game.*'],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   ...pluginVue.configs['flat/recommended'],
@@ -17,7 +21,7 @@ export default tseslint.config(
     languageOptions: { globals: globals.browser },
   },
   {
-    files: ['apps/server/**/*.ts', 'packages/shared/**/*.ts', '**/*.config.{js,ts}', 'apps/web/e2e/**/*.ts'],
+    files: ['apps/server/**/*.ts', 'packages/shared/**/*.ts', '**/*.config.{js,ts}', 'e2e/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
   {

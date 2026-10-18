@@ -1,26 +1,27 @@
 import { JACKPOTS } from '@lowrider/shared/config/features';
 import type { CashBag } from '@lowrider/shared/engine/features/holdAndSpin';
 
-/** Counts: 1,234. */
-export const fmt = (n: number) => n.toLocaleString('en-US');
+/** Counts, Dutch style like the casino: 1.234. */
+export const fmt = (n: number) => n.toLocaleString('nl-NL');
 
-/** Euro cents as euros: €0.40, €1,250.00. */
+/** Euro cents the way the casino writes them: € 0,40, € 1.250,00. Never a dollar sign. */
 export function euro(cents: number): string {
-  return `€${(cents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `€\u00a0${(cents / 100).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-/** Euro cents for small spaces: €0.40, €12, €1.2K. */
+/** Euro cents for small spaces: € 0,40, € 12, € 1,2K. */
 export function euroShort(cents: number): string {
   const e = cents / 100;
-  if (e >= 1_000_000) return `€${+(e / 1_000_000).toFixed(1)}M`;
-  if (e >= 1000) return `€${+(e / 1000).toFixed(1)}K`;
-  return Number.isInteger(e) ? `€${e}` : euro(cents);
+  const short = (v: number) => (+v.toFixed(1)).toLocaleString('nl-NL');
+  if (e >= 1_000_000) return `€\u00a0${short(e / 1_000_000)}M`;
+  if (e >= 1000) return `€\u00a0${short(e / 1000)}K`;
+  return Number.isInteger(e) ? `€\u00a0${e}` : euro(cents);
 }
 
-/** A balance as the casino reports it (euro cents or casino tokens). */
-export function money(balance: { value: number; unit: 'cents' | 'tokens' } | null): string {
-  if (!balance) return '—';
-  return balance.unit === 'cents' ? euro(balance.value) : `${fmt(balance.value)} TOKENS`;
+/** A token balance: four decimals, always rounded down (0,05199 tok shows as 0,0519 tok). */
+export function tokens(micro: number): string {
+  const floored = Math.floor(micro / 100) / 10_000;
+  return `${floored.toLocaleString('nl-NL', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} tok`;
 }
 
 export function bagLabel(bag: CashBag): string {

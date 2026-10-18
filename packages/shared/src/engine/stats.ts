@@ -1,4 +1,4 @@
-import { createRng } from './rng';
+import { createRng, type Rng } from './rng';
 import { FEATURES, INITIAL_STATE, playRound, type FeatureKey } from './round';
 
 /** Where the RTP comes from, as fractions of the total amount bet. */
@@ -24,9 +24,9 @@ export interface RtpBreakdown {
 const perFeature = (value: number) =>
   Object.fromEntries(FEATURES.map((f) => [f, value])) as Record<FeatureKey, number>;
 
-/** Runs `rounds` rounds from a seed and measures the game's maths. */
-export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdown {
-  const rng = createRng(seed);
+/** Runs `rounds` rounds from a seed (or a given RNG, such as the CSPRNG) and measures the game's maths. */
+export function simulate(rounds: number, seed: number | Rng, lineBet = 1): RtpBreakdown {
+  const rng = typeof seed === 'number' ? createRng(seed) : seed;
   let state = INITIAL_STATE;
   let bet = 0;
   let won = 0;
