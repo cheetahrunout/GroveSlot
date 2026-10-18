@@ -110,6 +110,12 @@ export const WANTED = {
   guaranteedMultiplier: 5,
 } as const;
 
+export const GAMBLE = {
+  maxRounds: 5,
+  /** The stake can grow to at most this × the original win. */
+  capMultiplier: 10,
+} as const;
+
 /**
  * Share of the 96% RTP each part of the game is tuned to. The simulator
  * test checks the measured values against these.

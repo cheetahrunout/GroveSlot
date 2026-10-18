@@ -12,6 +12,9 @@ import { presentFreeSpins } from './presenters/freeSpins';
 import { presentLowriderHop } from './presenters/lowriderHop';
 import { presentHoldAndSpin } from './presenters/holdAndSpin';
 import { presentTurfWar } from './presenters/turfWar';
+import { playGamble } from '../engine/features/gamble';
+import { CarChaseScene } from '../view/scenes/CarChaseScene';
+import { tween } from '../view/tween';
 import { bagLabels } from '../view/format';
 import { load, save } from '../economy/storage';
 
@@ -44,6 +47,10 @@ export class GameController {
   forceDriveBy = false;
   private scene!: GameScene;
   private roundWin = 0;
+  /** The last round's win, while the Car Chase gamble is on offer. */
+  private gambleOffer = 0;
+  /** Player setting: offer the gamble after wins. */
+  gambleEnabled = true;
   /** Debug only: the next spin triggers this feature. */
   forceNext: FeatureKey | undefined;
 
@@ -102,6 +109,37 @@ export class GameController {
     this.stopAuto();
   }
 
+  private setGambleOffer(amount: number): void {
+    this.gambleOffer = amount;
+    this.scene.hud.gamble.visible = amount > 0;
+  }
+
+  /** Car Chase: risk the last win on a 50/50 for double. */
+  async gamble(): Promise<void> {
+    const offer = this.gambleOffer;
+    if (this.busy || offer <= 0) return;
+    const { scene, wallet } = this;
+    this.busy = true;
+    scene.hud.setBusy(true);
+    this.setGambleOffer(0);
+    try {
+      wallet.debit(offer);
+      const view = new CarChaseScene(scene.layout);
+      view.alpha = 0;
+      scene.overlay.addChild(view);
+      await tween(view, { alpha: 1 }, 250);
+      const final = await view.play(offer, (pick, stake) => playGamble(this.rng, pick, stake));
+      await tween(view, { alpha: 0 }, 250);
+      view.destroy({ children: true });
+      wallet.credit(final);
+      scene.hud.win.setValue(final > 0 ? fmt(final) : '—');
+      this.refreshHud();
+    } finally {
+      this.busy = false;
+      scene.hud.setBusy(false);
+    }
+  }
+
   private addWin(amount: number): void {
     this.roundWin += amount;
     this.scene.hud.win.setValue(fmt(this.roundWin));
@@ -144,6 +182,7 @@ export class GameController {
     this.busy = true;
     scene.hud.setBusy(true);
     try {
+      this.setGambleOffer(0);
       wallet.placeBet();
       this.refreshHud();
       scene.hud.win.setValue('—');
@@ -181,6 +220,7 @@ export class GameController {
         );
       }
       this.refreshHud();
+      if (result.totalWin > 0 && this.autoRemaining === null && this.gambleEnabled) this.setGambleOffer(result.totalWin);
       return result;
     } finally {
       this.busy = false;

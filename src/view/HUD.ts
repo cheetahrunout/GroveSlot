@@ -37,6 +37,7 @@ export interface HudHandlers {
   startAuto(count: number): void;
   stopAuto(): void;
   toggleTurbo(): void;
+  gamble(): void;
 }
 
 /** Balance, bet, win, auto-spin, turbo and the spin button. */
@@ -49,6 +50,8 @@ export class HUD {
   readonly spin: Button;
   readonly auto: Button;
   readonly turbo: Button;
+  /** Offered after a win: double or nothing in the Car Chase. */
+  readonly gamble: Button;
   readonly autoMenu = new Container();
   private autoRunning = false;
 
@@ -64,6 +67,8 @@ export class HUD {
       this.autoRunning ? handlers.stopAuto() : (this.autoMenu.visible = !this.autoMenu.visible),
     );
     this.turbo = new Button({ width: 170, height: 110, label: 'TURBO', fontSize: 34 }, handlers.toggleTurbo);
+    this.gamble = new Button({ width: 220, height: 84, label: 'GAMBLE ×2', fontSize: 34, fill: COLORS.danger }, handlers.gamble);
+    this.gamble.visible = false;
 
     // Auto-spin choices pop up above the AUTO button.
     this.autoMenu.visible = false;
@@ -78,7 +83,7 @@ export class HUD {
   }
 
   get all(): Container[] {
-    return [this.balance, this.bet, this.win, this.auto, this.turbo, this.spin, this.autoMenu];
+    return [this.balance, this.bet, this.win, this.auto, this.turbo, this.spin, this.gamble, this.autoMenu];
   }
 
   setAutoRemaining(remaining: number | null): void {

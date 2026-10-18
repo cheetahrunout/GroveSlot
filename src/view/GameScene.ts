@@ -81,6 +81,7 @@ export class GameScene extends Container {
       hud.spin.position.set(left + ReelsView.outerWidth + spinColumn / 2 - 24, 150 + ReelsView.outerHeight / 2 - 24);
       this.wanted.scale.set(1);
       this.wanted.position.set(hud.spin.x, 260);
+      hud.gamble.position.set(hud.spin.x - 110, hud.spin.y + 150);
 
       const y = 150 + ReelsView.outerHeight + 10;
       const gap = 24;
@@ -112,6 +113,7 @@ export class GameScene extends Container {
       hud.turbo.position.set(leftX + colW + gap + 170 + gap, below + 140);
       hud.autoMenu.position.set(leftX + colW + gap, below + 130);
       hud.spin.position.set(W / 2, below + 420);
+      hud.gamble.position.set(W / 2 + 160, below + 378);
     }
   }
 }

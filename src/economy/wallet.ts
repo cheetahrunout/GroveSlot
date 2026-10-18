@@ -61,6 +61,15 @@ export class Wallet {
     return this.totalBet;
   }
 
+  /** Takes a gamble stake out of the balance. */
+  debit(amount: number): void {
+    if (!(amount >= 0) || !Number.isFinite(amount) || amount > this.data.balance) {
+      throw new RangeError(`Bad debit amount ${amount}`);
+    }
+    this.data.balance -= Math.floor(amount);
+    this.persist();
+  }
+
   credit(amount: number): void {
     if (!(amount >= 0) || !Number.isFinite(amount)) throw new RangeError(`Bad credit amount ${amount}`);
     this.data.balance += Math.floor(amount);

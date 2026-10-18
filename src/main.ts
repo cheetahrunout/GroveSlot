@@ -21,6 +21,7 @@ async function boot() {
     startAuto: (n) => controller.startAuto(n),
     stopAuto: () => controller.stopAuto(),
     toggleTurbo: () => controller.toggleTurbo(),
+    gamble: () => void controller.gamble(),
   });
   app.stage.addChild(scene);
   controller.attach(scene);
