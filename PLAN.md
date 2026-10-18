@@ -39,7 +39,7 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 
 ### Grid and paylines
 - **5×3 grid, 20 fixed paylines**, left-to-right, 3+ of a kind pays.
-- Later option: switch to 243 ways-to-win as a config flag (the evaluator should support both).
+- Wins are shown by drawing the winning lines over the reels, with the line number and payout.
 
 ### Symbols (original artwork, Grove Street flavour)
 
@@ -141,7 +141,7 @@ src/
   engine/                 # pure TS, no rendering → fully unit-testable
     rng.ts                # seedable PRNG (e.g. xoshiro128**), crypto seed by default
     spin.ts               # pick stops → grid
-    evaluate.ts           # lines/ways evaluation, scatter, bonus detection
+    evaluate.ts           # payline evaluation, scatter, bonus detection
     features/
       freeSpins.ts
       lowriderHop.ts
@@ -244,7 +244,7 @@ After every feature milestone, re-run the simulator and keep the total RTP insid
 ---
 
 ## 10. Decisions
-1. **Paylines:** 20 fixed lines (default; ways-to-win stays an option in the evaluator).
+1. **Paylines:** 20 fixed lines, left to right (confirmed; no ways-to-win).
 2. **Lowrider Hop:** no skill, pure odds. The outcome is drawn when the bonus triggers.
 3. **Layout:** desktop first, with the portrait/mobile layout prepared from the start.
 4. **Leaderboard:** prepared now (interface + local storage); screen added in milestone 10.
