@@ -45,6 +45,26 @@ describe('production mode', () => {
     expect(cookie.value).not.toBe(sessions[0]);
   });
 
+  it('keeps a seat per tab: a second seat for the same player leaves the first alone', async () => {
+    const a = await app.inject({ method: 'POST', url: '/api/session', payload: { token: 'cj' } });
+    const b = await app.inject({ method: 'POST', url: '/api/session', payload: { token: 'cj' } });
+    const seatA = a.json().seat as string;
+    const seatB = b.json().seat as string;
+    expect(seatA).toBeTruthy();
+    expect(seatB).toBeTruthy();
+    expect(seatA).not.toBe(seatB);
+    const state = await app.inject({ url: '/api/state', headers: { 'x-lowrider-seat': seatA } });
+    expect(state.json().seat).toBe(seatA);
+    const spinA = await app.inject({ method: 'POST', url: '/api/spin', payload: { betCents: 20 }, headers: { 'x-lowrider-seat': seatA } });
+    const spinB = await app.inject({ method: 'POST', url: '/api/spin', payload: { betCents: 20 }, headers: { 'x-lowrider-seat': seatB } });
+    expect(spinA.statusCode).toBe(200);
+    expect(spinB.statusCode).toBe(200);
+    const left = await app.inject({ method: 'POST', url: `/api/leave?seat=${encodeURIComponent(seatB)}` });
+    expect(left.statusCode).toBe(200);
+    expect((await app.inject({ url: '/api/state', headers: { 'x-lowrider-seat': seatA } })).json().seat).toBe(seatA);
+    expect((await app.inject({ url: '/api/state', headers: { 'x-lowrider-seat': seatB } })).json().seat).toBeNull();
+  });
+
   it('sends a visitor without a session back through the casino', async () => {
     const res = await app.inject({ method: 'POST', url: '/api/session', payload: {} });
     expect(res.statusCode).toBe(401);
