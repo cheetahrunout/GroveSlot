@@ -45,7 +45,9 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 
 | Tier | Symbol | Notes |
 |---|---|---|
-| Wild | **Green Bandana** | Substitutes for all except Scatter/Bonus; expands to a full reel during free spins |
+| Wild | **Trident G** (`wild-trident-g.jpg`) | Substitutes for all except Scatter/Bonus; expands to a full reel during free spins |
+| Jackpot | **Crown G** (`kingpin-crown-g.jpg`) | Only appears on Cash Bags in Hold & Spin and marks the Kingpin (Grand) jackpot; also the big-win "Kingpin" badge |
+| Feature | **Palm G** (`turf-war-palms-g.jpg`) | Turf War emblem: shown on the wheel hub and the "Turf War!" trigger splash; 3 on reels 2–4 also triggers Turf War |
 | Scatter | **Spray Can** | 3+ anywhere triggers Free Spins |
 | Bonus | **Lowrider** | 3 on reels 1, 3 and 5 trigger the Lowrider Hop bonus |
 | High | The OG (gang leader portrait), Green Sabre (muscle car), Cul-de-sac house, Gold Chain |
@@ -78,7 +80,7 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 - The timing only adjusts the multiplier inside a fixed range, so the RTP stays predictable. The outcome table is still decided by the RNG, and the timing nudges you up or down one step.
 
 ### 4.3 Turf War (wheel / map bonus)
-- Triggered by a random **"Turf War!"** event after any non-winning spin (≈1 in 150).
+- Triggered by 3 **Palm G** symbols on reels 2–4, or by a random **"Turf War!"** event after any non-winning spin (≈1 in 150).
 - A Los Santos map with territories (homage names: Idlewood, Ganton, Jefferson, East LS, Glen Park…).
 - You spin a wheel to "take" territories. Each one pays a token prize, and some unlock extra spins of the wheel. A "Ballas" slice (purple) ends the round.
 - Taking all territories pays a **Turf Boss** prize of 100× bet.
@@ -175,6 +177,21 @@ public/assets/            # original sprites, atlases, audio
 ---
 
 ## 7. Art and audio direction
+
+### Provided artwork (`public/assets/symbols/`)
+| File | Content | Use |
+|---|---|---|
+| `wild-trident-g.jpg` | White G with a trident on a green circle, framed like a reel band | **Wild** symbol; also a candidate for the game logo / favicon |
+| `kingpin-crown-g.jpg` | Green G under a crown with a star, on black | **Kingpin jackpot** symbol, Grand jackpot banner, "Kingpin" big-win badge |
+| `turf-war-palms-g.jpg` | Crowned G between two palm trees, on blue | **Turf War** trigger symbol and wheel hub |
+
+Prep before use:
+- All three are 768×1152 JPGs (portrait, opaque background). Reel cells are roughly square, so crop each to its central emblem (about 768×768) or show the full card on a portrait cell.
+- Cut the emblems out to transparent PNGs/WebP, so they can glow, pulse and sit on any background, and pack them into a texture atlas with the other symbols.
+- Draw the rest of the symbols in the same style (bold white outlines, flat green/black shading) so the set looks consistent.
+- Palette note: the blue Palm G stands out from the green set, which suits a special trigger symbol.
+
+### General direction
 - Palette: Grove green (#1f7a1f-ish), sunset orange and purple, concrete grey, gold accents.
 - Style: chunky early-2000s game UI, graffiti fonts (open-licensed, such as from Google Fonts), slight VHS grain overlay.
 - Backgrounds: a cul-de-sac at sunset (base game), a night version with streetlights (free spins).
