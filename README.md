@@ -15,7 +15,7 @@
 - **Free tokens:** you start with 10,000, get a daily allowance of 2,000, and a once-an-hour top-up if you go broke.
 - **Progress:** stats, 11 trophies, unlockable reel skins and a local leaderboard, all in MENU.
 - Every bonus opens and closes with a paint-stripe transition: a lowrider hops across the screen, the stripes follow, and the bonus name is sprayed on.
-- Original artwork and synthesised sound and music. The three G emblems are the provided artwork in `public/assets/symbols/`.
+- Original artwork and synthesised sound and music. The three G emblems are the provided artwork in `src/assets/symbols/`.
 
 Payback is tuned to about **96%** (the measured value is 95.8% over 10 million simulated rounds). It's play money, but the maths is honest, and the simulator checks it on every commit.
 
@@ -46,6 +46,14 @@ In `npm run dev` builds, the browser console has a debug hook for testing bonuse
 - `src/audio/`: Web Audio sound effects and music
 
 See [PLAN.md](PLAN.md) for the full design.
+
+## One-file version
+
+```sh
+npm run build:single   # writes dist-single/index.html
+```
+
+That single HTML file holds the whole game: code, images and fonts. Upload it to any web host, or just open it from disk in a browser. Tokens and progress are saved in that browser, separately for each site address.
 
 ## Deploy
 

@@ -1,4 +1,5 @@
 import { Application } from 'pixi.js';
+import wildIcon from './assets/symbols/wild-trident-g.jpg';
 import { sound } from './audio/sound';
 import { Progress } from './economy/progress';
 import { Wallet } from './economy/wallet';
@@ -11,7 +12,15 @@ import { GameScene } from './view/GameScene';
 import { computeLayout } from './view/layout';
 import { COLORS } from './view/theme';
 
+function setFavicon(): void {
+  const link = document.createElement('link');
+  link.rel = 'icon';
+  link.href = wildIcon;
+  document.head.appendChild(link);
+}
+
 async function boot() {
+  setFavicon();
   const app = new Application();
   await app.init({ resizeTo: window, background: COLORS.background, antialias: true });
   document.body.appendChild(app.canvas);

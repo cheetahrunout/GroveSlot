@@ -178,7 +178,7 @@ tests/                    # 63 Vitest tests, including a 200k-round maths check
 
 ## 7. Art and audio direction
 
-### Provided artwork (`public/assets/symbols/`)
+### Provided artwork (`src/assets/symbols/`)
 | File | Content | Use |
 |---|---|---|
 | `wild-trident-g.jpg` | White G with a trident on a green circle, framed like a reel band | **Wild** symbol; also a candidate for the game logo / favicon |

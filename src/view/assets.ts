@@ -3,14 +3,17 @@ import '@fontsource/permanent-marker/400.css';
 import { Assets, Rectangle, Texture, type Renderer } from 'pixi.js';
 import type { SymbolId } from '../config/symbols';
 import { ART_SIZE, DRAWN_SYMBOLS, drawSymbolArt } from './art/symbols';
+import kingpinUrl from '../assets/symbols/kingpin-crown-g.jpg';
+import turfUrl from '../assets/symbols/turf-war-palms-g.jpg';
+import wildUrl from '../assets/symbols/wild-trident-g.jpg';
 
 const SYMBOL_ART: Partial<Record<SymbolId, string>> = {
-  WILD: 'assets/symbols/wild-trident-g.jpg',
-  TURF: 'assets/symbols/turf-war-palms-g.jpg',
+  WILD: wildUrl,
+  TURF: turfUrl,
 };
 
 const EXTRA_ART = {
-  kingpin: 'assets/symbols/kingpin-crown-g.jpg',
+  kingpin: kingpinUrl,
 } as const;
 
 export interface GameTextures {
