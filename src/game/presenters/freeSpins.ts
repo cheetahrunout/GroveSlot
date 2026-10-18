@@ -8,6 +8,7 @@ export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult)
   const { scene } = ctx;
   const { reels, freeSpinsBar: bar, banner } = scene;
   const baseGrid = reels.currentGrid.map((c) => [...c]);
+  const baseLabels = reels.currentLabels;
 
   await banner.show('FREE SPINS!', `${fs.initialSpins} GROVE STREET FREE SPINS`, 1300);
   scene.setMode('freeSpins');
@@ -50,5 +51,5 @@ export async function presentFreeSpins(ctx: PresentContext, fs: FreeSpinsResult)
   reels.clearWins();
   await banner.show('FREE SPINS WIN', fmt(fs.totalWin), 1500);
   scene.setMode('base');
-  reels.show(baseGrid);
+  reels.show(baseGrid, baseLabels);
 }

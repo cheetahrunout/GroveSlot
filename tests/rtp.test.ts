@@ -20,8 +20,13 @@ describe('game maths (200k simulated rounds)', () => {
     expect(r.features.lowriderHop).toBeLessThan(0.1);
   });
 
+  it('keeps Cash Run and jackpots near their RTP budget', () => {
+    expect(r.features.holdAndSpin).toBeGreaterThan(0.04);
+    expect(r.features.holdAndSpin).toBeLessThan(0.11);
+  });
+
   it('keeps the hit rate in range', () => {
-    expect(r.hitRate).toBeGreaterThan(0.2);
+    expect(r.hitRate).toBeGreaterThan(0.18);
     expect(r.hitRate).toBeLessThan(0.32);
   });
 });

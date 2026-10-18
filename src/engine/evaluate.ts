@@ -1,6 +1,7 @@
 import { PAYLINES } from '../config/paylines';
 import {
   BONUS_REELS,
+  CASH_TRIGGER_COUNT,
   LINE_PAYS,
   SCATTER_PAYS,
   TURF_REELS,
@@ -31,7 +32,10 @@ export interface Evaluation {
     freeSpins: boolean;
     lowriderHop: boolean;
     turfWar: boolean;
+    holdAndSpin: boolean;
   };
+  /** Every Cash Bag on screen. */
+  cashPositions: Position[];
   /**
    * Line wins + scatter win. The base game tops out at about 4,100× the
    * total bet, so the MAX_WIN_MULTIPLIER cap is applied per round once
@@ -90,6 +94,13 @@ export function evaluate(grid: Grid, lineBet: number): Evaluation {
   const scatterCount = scatterPositions.length;
   const scatterWin = (SCATTER_PAYS[Math.min(scatterCount, 5)] ?? 0) * totalBet;
 
+  const cashPositions: Position[] = [];
+  grid.forEach((column, reel) =>
+    column.forEach((symbol, row) => {
+      if (symbol === 'CASH') cashPositions.push({ reel, row });
+    }),
+  );
+
   const lineTotal = lineWins.reduce((sum, w) => sum + w.payout, 0);
   return {
     lineWins,
@@ -100,7 +111,9 @@ export function evaluate(grid: Grid, lineBet: number): Evaluation {
       freeSpins: scatterCount >= 3,
       lowriderHop: BONUS_REELS.every((reel) => reelHas(grid, reel, 'BONUS')),
       turfWar: TURF_REELS.every((reel) => reelHas(grid, reel, 'TURF')),
+      holdAndSpin: cashPositions.length >= CASH_TRIGGER_COUNT,
     },
+    cashPositions,
     totalWin: lineTotal + scatterWin,
   };
 }

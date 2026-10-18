@@ -25,6 +25,7 @@ export class ReelsView extends Container {
   private readonly lineLabel: Text;
   private readonly lineLabelBg = new Graphics();
   private grid: Grid = [];
+  private labels = new Map<string, string>();
   private winLoop = 0;
 
   constructor(private readonly textures: GameTextures) {
@@ -57,7 +58,13 @@ export class ReelsView extends Container {
     return this.grid;
   }
 
-  show(grid: Grid): void {
+  get currentLabels(): Map<string, string> {
+    return this.labels;
+  }
+
+  /** `labels` holds Cash Bag amounts keyed by "reel,row". */
+  show(grid: Grid, labels = this.labels): void {
+    this.labels = labels;
     this.grid = grid.map((c) => [...c]);
     grid.forEach((column, reel) => this.fillReel(reel, column));
   }
@@ -97,7 +104,7 @@ export class ReelsView extends Container {
     container.removeChildren().forEach((c) => c.destroy({ children: true }));
     container.y = 0;
     this.cellViews[reel] = column.map((symbol, row) => {
-      const view = createSymbolView(symbol, CELL, this.textures);
+      const view = createSymbolView(symbol, CELL, this.textures, this.labels.get(`${reel},${row}`));
       view.y = row * STEP;
       container.addChild(view);
       return view;
@@ -108,8 +115,16 @@ export class ReelsView extends Container {
    * Spins every reel and lands on `target`. Filler symbols come from the
    * real strips, so what scrolls past is what the reel holds.
    */
-  async spinTo(target: Grid, stops: readonly number[], strips: readonly (readonly SymbolId[])[], turbo: boolean): Promise<void> {
+  async spinTo(
+    target: Grid,
+    stops: readonly number[],
+    strips: readonly (readonly SymbolId[])[],
+    turbo: boolean,
+    labels = new Map<string, string>(),
+  ): Promise<void> {
     this.clearWins();
+    const previousLabels = this.labels;
+    this.labels = labels;
     const spins = target.map(async (column, reel) => {
       const strip = strips[reel];
       const fillerCount = turbo ? 6 + reel * 2 : 14 + reel * 5;
@@ -121,8 +136,17 @@ export class ReelsView extends Container {
 
       const container = this.reels[reel];
       container.removeChildren().forEach((c) => c.destroy({ children: true }));
+      const n = symbols.length;
       symbols.forEach((symbol, i) => {
-        const view = createSymbolView(symbol, CELL, this.textures);
+        // Landing cells show their amounts; the outgoing cells keep theirs.
+        const row = i - 1;
+        const label =
+          row >= 0 && row < ROW_COUNT
+            ? labels.get(`${reel},${row}`)
+            : i >= n - ROW_COUNT
+              ? previousLabels.get(`${reel},${i - (n - ROW_COUNT)}`)
+              : undefined;
+        const view = createSymbolView(symbol, CELL, this.textures, label);
         view.y = (i - 1) * STEP;
         container.addChild(view);
       });

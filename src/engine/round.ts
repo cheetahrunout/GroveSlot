@@ -2,23 +2,29 @@ import { PAYLINES } from '../config/paylines';
 import { MAX_WIN_MULTIPLIER } from '../config/paytable';
 import { BASE_REELS } from '../config/reels';
 import { evaluate, type Evaluation } from './evaluate';
+import { KINGPIN_POT_RATE } from '../config/features';
 import { playFreeSpins, type FreeSpinsResult } from './features/freeSpins';
+import { drawCashBag, playHoldAndSpin, type CashBag, type HoldAndSpinResult } from './features/holdAndSpin';
 import { playLowriderHop, type LowriderHopResult } from './features/lowriderHop';
 import type { Rng } from './rng';
 import { spinReels, type Grid } from './spin';
 
 /** State that carries over from one round to the next. */
-export interface GameState {}
+export interface GameState {
+  /** Tokens added to the Kingpin jackpot on top of its 1,000× bet. */
+  kingpinPot: number;
+}
 
-export const INITIAL_STATE: GameState = {};
+export const INITIAL_STATE: GameState = { kingpinPot: 0 };
 
 /** Bonus features, in the order a round plays them. */
-export const FEATURES = ['freeSpins', 'lowriderHop'] as const;
+export const FEATURES = ['freeSpins', 'lowriderHop', 'holdAndSpin'] as const;
 export type FeatureKey = (typeof FEATURES)[number];
 
 export interface RoundFeatures {
   freeSpins?: FreeSpinsResult;
   lowriderHop?: LowriderHopResult;
+  holdAndSpin?: HoldAndSpinResult;
 }
 
 export interface RoundResult {
@@ -27,6 +33,8 @@ export interface RoundResult {
   stops: number[];
   grid: Grid;
   base: Evaluation;
+  /** What each Cash Bag on the base grid holds. */
+  cashBags: CashBag[];
   features: RoundFeatures;
   /** Everything the round pays, after the max-win cap. */
   totalWin: number;
@@ -63,9 +71,16 @@ export function playRound(
   const totalBet = lineBet * PAYLINES.length;
   const { stops, grid, evaluation: base } = baseSpin(rng, lineBet, options.force);
 
+  const cashBags = base.cashPositions.map((p) => drawCashBag(rng, p, totalBet));
+  let kingpinPot = state.kingpinPot + totalBet * KINGPIN_POT_RATE;
+
   const features: RoundFeatures = {};
   if (base.triggers.freeSpins) features.freeSpins = playFreeSpins(rng, base.scatterCount, lineBet);
   if (base.triggers.lowriderHop) features.lowriderHop = playLowriderHop(rng, totalBet);
+  if (base.triggers.holdAndSpin) {
+    features.holdAndSpin = playHoldAndSpin(rng, cashBags, totalBet, kingpinPot);
+    if (features.holdAndSpin.grand) kingpinPot = 0;
+  }
 
   const uncapped = base.totalWin + Object.values(features).reduce((sum, f) => sum + f.totalWin, 0);
   const cap = totalBet * MAX_WIN_MULTIPLIER;
@@ -75,9 +90,10 @@ export function playRound(
     stops,
     grid,
     base,
+    cashBags,
     features,
     totalWin: Math.min(uncapped, cap),
     capped: uncapped > cap,
   };
-  return { result, state };
+  return { result, state: { ...state, kingpinPot } };
 }

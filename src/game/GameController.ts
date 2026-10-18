@@ -9,8 +9,17 @@ import { countUp, timing, wait } from '../view/tween';
 import type { PresentContext } from './presenters/context';
 import { presentFreeSpins } from './presenters/freeSpins';
 import { presentLowriderHop } from './presenters/lowriderHop';
+import { presentHoldAndSpin } from './presenters/holdAndSpin';
+import { bagLabels } from '../view/format';
+import { load, save } from '../economy/storage';
 
 import { fmt } from './presenters/context';
+
+function loadGameState(): GameState {
+  const saved = load<GameState>('game', 1, INITIAL_STATE);
+  const pot = Number(saved?.kingpinPot);
+  return { ...INITIAL_STATE, kingpinPot: Number.isFinite(pot) && pot >= 0 ? pot : 0 };
+}
 
 /** Big wins stop auto-spin, as a multiple of the total bet. */
 const AUTO_STOP_WIN = 25;
@@ -20,7 +29,7 @@ export class GameController {
   private busy = false;
   private autoRemaining: number | null = null;
   private turbo = false;
-  private state: GameState = INITIAL_STATE;
+  private state: GameState = loadGameState();
   private scene!: GameScene;
   private roundWin = 0;
   /** Debug only: the next spin triggers this feature. */
@@ -39,6 +48,7 @@ export class GameController {
     const hud = this.scene.hud;
     hud.balance.setValue(fmt(this.wallet.balance));
     hud.bet.setValue(fmt(this.wallet.totalBet));
+    this.scene.jackpots.update(this.wallet.totalBet, this.state.kingpinPot);
   }
 
   changeBet(direction: 1 | -1): void {
@@ -99,6 +109,10 @@ export class GameController {
       await wait(400);
       await presentLowriderHop(ctx, result.features.lowriderHop);
     }
+    if (result.features.holdAndSpin) {
+      await wait(400);
+      await presentHoldAndSpin(ctx, result.features.holdAndSpin);
+    }
   }
 
   /** Plays one round. Returns null when the spin could not start. */
@@ -120,9 +134,10 @@ export class GameController {
       const { result, state } = playRound(this.rng, this.state, wallet.lineBet, { force: this.forceNext });
       this.forceNext = undefined;
       this.state = state;
+      save('game', 1, state);
       this.roundWin = 0;
 
-      await scene.reels.spinTo(result.grid, result.stops, BASE_REELS, this.turbo);
+      await scene.reels.spinTo(result.grid, result.stops, BASE_REELS, this.turbo, bagLabels(result.cashBags));
       const base = result.base;
       if (base.totalWin > 0) {
         this.addWin(base.totalWin);

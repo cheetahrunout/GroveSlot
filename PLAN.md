@@ -46,14 +46,14 @@ A browser slot machine themed on Grove Street (GTA: San Andreas). You play with 
 | Tier | Symbol | Notes |
 |---|---|---|
 | Wild | **Trident G** (`wild-trident-g.jpg`) | Substitutes for all except Scatter/Bonus; expands to a full reel during free spins |
-| Jackpot | **Crown G** (`kingpin-crown-g.jpg`) | Only appears on Cash Bags in Hold & Spin and marks the Kingpin (Grand) jackpot; also the big-win "Kingpin" badge |
+| Jackpot | **Crown G** (`kingpin-crown-g.jpg`) | Marks the Kingpin (Grand) jackpot: on the jackpot meter and the Kingpin win screen (won by filling all 15 cells in Cash Run) |
 | Feature | **Palm G** (`turf-war-palms-g.jpg`) | Turf War emblem: shown on the wheel hub and the "Turf War!" trigger splash; 3 on reels 2–4 also triggers Turf War |
 | Scatter | **Spray Can** | 3+ anywhere triggers Free Spins |
 | Bonus | **Lowrider** | 3 on reels 1, 3 and 5 trigger the Lowrider Hop bonus |
 | High | The OG (gang leader portrait), Green Sabre (muscle car), Cul-de-sac house, Gold Chain |
 | Mid | Boombox, BMX bike, Basketball, Cap & shades |
 | Low | A, K, Q, J, 10 styled as graffiti tags |
-| Special | **Cash Bag** | Holds a token value; used by the Hold & Spin feature |
+| Special | **Cash Bag** | Holds a token value (1×–25× bet) or a Homie/Soldier/OG jackpot; lands in stacks of 2; 6+ start Cash Run |
 
 ### Bet settings
 - Bet per line: 1, 2, 5, 10, 25 tokens → total bet 20–500.
@@ -235,7 +235,7 @@ Prep before use:
 | 4 | **Base game UI** ✅ | Spinning reels with bounce, HUD (balance, bet −/+, win, auto-spin 10–100, turbo, space bar), win lines cycling with labels, saved wallet |
 | 5 | **Free Spins** ✅ | Spray Can trigger (10/15/20 spins), night backdrop, expanding wilds, Tag the Hood wall raising the multiplier to ×5 with +2 spins per level, +10 retriggers, free-spin RTP ≈ 21% |
 | 6 | **Lowrider Hop** ✅ | Pick 1 of 3 lowriders (cosmetic), 5 hops drawn from a weighted ×2–×50 table when the bonus triggers; HOP only plays the next animation; ≈ 7% RTP |
-| 7 | **Hold & Spin + Jackpots** | Cash Bags, respins, 4 jackpot tiers |
+| 7 | **Hold & Spin + Jackpots** ✅ | Stacked Cash Bags with values, 6+ start Cash Run: 3 respins that reset on every new bag, collect screen, Homie/Soldier/OG bag jackpots, Kingpin (1,000× + pot) for all 15 cells, jackpot meter, saved pot; ≈ 7.7% RTP |
 | 8 | **Turf War + Drive-By + Wanted Level** | Random features and wheel/map scene |
 | 9 | **Gamble** | Car Chase double-or-nothing |
 | 10 | **Economy polish** | Daily handout, rescue, stats, achievements, cosmetic unlocks |

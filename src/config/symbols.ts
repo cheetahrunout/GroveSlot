@@ -4,6 +4,7 @@ export const SYMBOLS = [
   'SCATTER', // Spray Can → Free Spins
   'BONUS', // Lowrider → Lowrider Hop
   'TURF', // Palm G → Turf War
+  'CASH', // Cash Bag → Cash Run (Hold & Spin)
   'OG',
   'SABRE',
   'HOUSE',
@@ -22,4 +23,4 @@ export const SYMBOLS = [
 export type SymbolId = (typeof SYMBOLS)[number];
 
 /** Symbols that never take part in payline wins and are never replaced by WILD. */
-export const SPECIAL_SYMBOLS: ReadonlySet<SymbolId> = new Set(['SCATTER', 'BONUS', 'TURF']);
+export const SPECIAL_SYMBOLS: ReadonlySet<SymbolId> = new Set(['SCATTER', 'BONUS', 'TURF', 'CASH']);

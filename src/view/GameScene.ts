@@ -2,6 +2,7 @@ import { Container, Graphics, Text } from 'pixi.js';
 import type { GameTextures } from './assets';
 import { Banner } from './Banner';
 import { FreeSpinsBar } from './FreeSpinsBar';
+import { JackpotBar } from './JackpotBar';
 import { HUD, type HudHandlers } from './HUD';
 import type { Layout } from './layout';
 import { ReelsView } from './ReelsView';
@@ -13,6 +14,7 @@ export class GameScene extends Container {
   readonly hud: HUD;
   readonly banner = new Banner();
   readonly freeSpinsBar = new FreeSpinsBar();
+  readonly jackpots: JackpotBar;
   private mode: 'base' | 'freeSpins' = 'base';
   /** Full-screen layer for bonus games, above the reels and HUD. */
   readonly overlay = new Container();
@@ -24,6 +26,7 @@ export class GameScene extends Container {
   constructor(readonly textures: GameTextures, handlers: HudHandlers) {
     super();
     this.reels = new ReelsView(textures);
+    this.jackpots = new JackpotBar(textures.kingpin);
     this.hud = new HUD(handlers);
     this.title = new Text({
       text: 'GROVESLOT',
@@ -36,12 +39,13 @@ export class GameScene extends Container {
     });
     this.disclaimer.anchor.set(0.5, 1);
     this.freeSpinsBar.visible = false;
-    this.addChild(this.backdrop, this.title, this.freeSpinsBar, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner);
+    this.addChild(this.backdrop, this.title, this.jackpots, this.freeSpinsBar, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner);
   }
 
   setMode(mode: 'base' | 'freeSpins'): void {
     this.mode = mode;
     this.freeSpinsBar.visible = mode === 'freeSpins';
+    this.jackpots.visible = mode === 'base';
     this.title.visible = mode === 'base' || this.layout.mode === 'portrait';
     this.drawBackdrop();
   }
@@ -62,6 +66,7 @@ export class GameScene extends Container {
     this.title.position.set(W / 2, 14);
     this.disclaimer.position.set(W / 2, H - 14);
     this.banner.position.set(W / 2, H / 2 - 60);
+    this.jackpots.arrange(layout.mode, W);
 
     if (layout.mode === 'landscape') {
       const spinColumn = 280;

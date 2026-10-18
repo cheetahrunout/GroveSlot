@@ -47,13 +47,21 @@ describe('reel strips', () => {
     });
   });
 
-  it('never shows two specials or wilds in the same reel window', () => {
+  it('never shows two specials or wilds in the same reel window (Cash Bags may stack)', () => {
     for (const strip of BASE_REELS) {
       for (let stop = 0; stop < strip.length; stop++) {
         const window = Array.from({ length: MIN_SPECIAL_SPACING }, (_, r) => strip[(stop + r) % strip.length]);
-        expect(window.filter((s) => s === 'WILD' || SPECIAL_SYMBOLS.has(s)).length).toBeLessThanOrEqual(1);
+        expect(window.filter((s) => s === 'WILD' || (SPECIAL_SYMBOLS.has(s) && s !== 'CASH')).length).toBeLessThanOrEqual(1);
       }
     }
+  });
+
+  it('keeps Cash Bags in stacks of 2', () => {
+    BASE_REELS.forEach((strip, reel) => {
+      const total = BASE_REEL_COUNTS[reel].CASH ?? 0;
+      const pairs = strip.filter((s, i) => s === 'CASH' && strip[(i + 1) % strip.length] === 'CASH').length;
+      expect(pairs).toBeGreaterThanOrEqual(Math.floor(total / 2));
+    });
   });
 
   it('is deterministic for a given seed', () => {

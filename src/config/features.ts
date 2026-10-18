@@ -18,18 +18,52 @@ export const LOWRIDER_HOP = {
   hops: 5,
   /**
    * Each hop pays a multiple of the total bet; higher hops are rarer.
-   * Mean ≈ 7.95× per hop, ≈ 40× per bonus.
+   * Mean ≈ 9.7× per hop, ≈ 49× per bonus.
    */
   table: [
     { multiplier: 2, weight: 24 },
-    { multiplier: 3, weight: 22 },
-    { multiplier: 5, weight: 18 },
-    { multiplier: 8, weight: 12 },
-    { multiplier: 10, weight: 9 },
-    { multiplier: 15, weight: 7 },
-    { multiplier: 25, weight: 4 },
-    { multiplier: 50, weight: 4 },
+    { multiplier: 4, weight: 22 },
+    { multiplier: 6, weight: 18 },
+    { multiplier: 10, weight: 12 },
+    { multiplier: 12, weight: 9 },
+    { multiplier: 20, weight: 7 },
+    { multiplier: 30, weight: 4 },
+    { multiplier: 60, weight: 4 },
   ],
+} as const;
+
+export type JackpotId = 'homie' | 'soldier' | 'og' | 'kingpin';
+
+export const JACKPOTS: Record<JackpotId, { name: string; multiplier: number }> = {
+  homie: { name: 'HOMIE', multiplier: 20 },
+  soldier: { name: 'SOLDIER', multiplier: 50 },
+  og: { name: 'OG', multiplier: 250 },
+  kingpin: { name: 'KINGPIN', multiplier: 1000 },
+};
+
+/** Share of every bet that grows the Kingpin pot, paid on top of 1,000× bet. */
+export const KINGPIN_POT_RATE = 0.005;
+
+export const CASH_RUN = {
+  /** Respins given at the start and after every new Cash Bag. */
+  respins: 3,
+  /** Chance that an empty cell lands a Cash Bag on a respin. */
+  landChance: 0.03,
+  /**
+   * What a Cash Bag holds: a multiple of the total bet or a jackpot.
+   * The Kingpin is only won by filling all 15 cells.
+   */
+  values: [
+    { multiplier: 1, weight: 30 },
+    { multiplier: 2, weight: 25 },
+    { multiplier: 3, weight: 15 },
+    { multiplier: 5, weight: 12 },
+    { multiplier: 10, weight: 6 },
+    { multiplier: 25, weight: 2 },
+    { jackpot: 'homie', weight: 1.2 },
+    { jackpot: 'soldier', weight: 0.4 },
+    { jackpot: 'og', weight: 0.06 },
+  ] as readonly ({ multiplier: number; weight: number } | { jackpot: Exclude<JackpotId, 'kingpin'>; weight: number })[],
 } as const;
 
 /**
@@ -40,4 +74,5 @@ export const RTP_BUDGET = {
   base: 0.58,
   freeSpins: 0.2,
   lowriderHop: 0.07,
+  holdAndSpin: 0.07,
 } as const;

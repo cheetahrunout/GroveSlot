@@ -8,30 +8,31 @@ describe('evaluateLine', () => {
   const line = (s: string) => s.split(' ') as SymbolId[];
 
   it('pays 3, 4 and 5 of a kind from the left only', () => {
-    expect(evaluateLine(line('K K K Q J'), 1)).toEqual({ symbol: 'K', count: 3, payout: 15 });
-    expect(evaluateLine(line('K K K K J'), 2)).toEqual({ symbol: 'K', count: 4, payout: 100 });
-    expect(evaluateLine(line('OG OG OG OG OG'), 1)).toEqual({ symbol: 'OG', count: 5, payout: 2000 });
+    expect(evaluateLine(line('K K K Q J'), 1)).toEqual({ symbol: 'K', count: 3, payout: 20 });
+    expect(evaluateLine(line('K K K K J'), 2)).toEqual({ symbol: 'K', count: 4, payout: 120 });
+    expect(evaluateLine(line('OG OG OG OG OG'), 1)).toEqual({ symbol: 'OG', count: 5, payout: 2500 });
     expect(evaluateLine(line('Q K K K K'), 1)).toBeNull();
     expect(evaluateLine(line('K K Q K K'), 1)).toBeNull();
   });
 
   it('lets wilds stand in, at the start or in the middle', () => {
-    expect(evaluateLine(line('WILD K K J Q'), 1)).toEqual({ symbol: 'K', count: 3, payout: 15 });
-    expect(evaluateLine(line('K WILD K WILD Q'), 1)).toEqual({ symbol: 'K', count: 4, payout: 50 });
+    expect(evaluateLine(line('WILD K K J Q'), 1)).toEqual({ symbol: 'K', count: 3, payout: 20 });
+    expect(evaluateLine(line('K WILD K WILD Q'), 1)).toEqual({ symbol: 'K', count: 4, payout: 60 });
   });
 
   it('pays the leading wilds on their own when that is worth more', () => {
-    // 3 wilds (200) beat 4 tens (25).
-    expect(evaluateLine(line('WILD WILD WILD TEN Q'), 1)).toEqual({ symbol: 'WILD', count: 3, payout: 200 });
-    // 5 OG (2000) beat 4 wilds (1000).
-    expect(evaluateLine(line('WILD WILD WILD WILD OG'), 1)).toEqual({ symbol: 'OG', count: 5, payout: 2000 });
-    expect(evaluateLine(line('WILD WILD WILD WILD WILD'), 1)).toEqual({ symbol: 'WILD', count: 5, payout: 4000 });
+    // 3 wilds (250) beat 4 tens (30).
+    expect(evaluateLine(line('WILD WILD WILD TEN Q'), 1)).toEqual({ symbol: 'WILD', count: 3, payout: 250 });
+    // 5 OG (2500) beat 4 wilds (1250).
+    expect(evaluateLine(line('WILD WILD WILD WILD OG'), 1)).toEqual({ symbol: 'OG', count: 5, payout: 2500 });
+    expect(evaluateLine(line('WILD WILD WILD WILD WILD'), 1)).toEqual({ symbol: 'WILD', count: 5, payout: 5000 });
   });
 
   it('does not let wilds replace specials, and specials break a line', () => {
     expect(evaluateLine(line('SCATTER WILD WILD K K'), 1)).toBeNull();
     expect(evaluateLine(line('WILD WILD SCATTER K K'), 1)).toBeNull();
-    expect(evaluateLine(line('WILD WILD WILD BONUS K'), 1)).toEqual({ symbol: 'WILD', count: 3, payout: 200 });
+    expect(evaluateLine(line('WILD WILD WILD BONUS K'), 1)).toEqual({ symbol: 'WILD', count: 3, payout: 250 });
+    expect(evaluateLine(line('K K CASH K K'), 1)).toBeNull();
     expect(evaluateLine(line('K K TURF K K'), 1)).toBeNull();
   });
 });
@@ -50,8 +51,8 @@ describe('evaluate', () => {
       'Q A J TEN A',
     );
     const result = evaluate(grid, 1);
-    expect(result.lineWins).toEqual([{ line: 0, symbol: 'K', count: 3, payout: 15 }]);
-    expect(result.totalWin).toBe(15);
+    expect(result.lineWins).toEqual([{ line: 0, symbol: 'K', count: 3, payout: 20 }]);
+    expect(result.totalWin).toBe(20);
   });
 
   it('pays scatters anywhere on the total bet and triggers free spins', () => {
@@ -73,7 +74,7 @@ describe('evaluate', () => {
       'J A BONUS K Q',
       'Q K J TEN BONUS',
     );
-    expect(evaluate(hop, 1).triggers).toEqual({ freeSpins: false, lowriderHop: true, turfWar: false });
+    expect(evaluate(hop, 1).triggers).toEqual({ freeSpins: false, lowriderHop: true, turfWar: false, holdAndSpin: false });
 
     const turf = gridFromRows(
       'A TURF Q J K',
@@ -91,7 +92,7 @@ describe('evaluate', () => {
     );
     const result = evaluate(allWild, 1);
     expect(result.lineWins).toHaveLength(20);
-    expect(result.totalWin).toBe(20 * 4000);
+    expect(result.totalWin).toBe(20 * 5000);
   });
 });
 
