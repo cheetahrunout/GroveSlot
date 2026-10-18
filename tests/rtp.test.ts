@@ -10,6 +10,11 @@ describe('game maths (200k simulated rounds)', () => {
     expect(r.base).toBeLessThan(0.62);
   });
 
+  it('keeps free spins near their RTP budget', () => {
+    expect(r.features.freeSpins).toBeGreaterThan(0.15);
+    expect(r.features.freeSpins).toBeLessThan(0.27);
+  });
+
   it('keeps the hit rate in range', () => {
     expect(r.hitRate).toBeGreaterThan(0.2);
     expect(r.hitRate).toBeLessThan(0.32);

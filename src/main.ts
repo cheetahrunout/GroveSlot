@@ -29,6 +29,11 @@ async function boot() {
   app.renderer.on('resize', relayout);
   relayout();
 
+  if (import.meta.env.DEV) {
+    // Debug hook for testing: __groveslot.controller.forceNext = 'freeSpins'
+    (window as unknown as Record<string, unknown>).__groveslot = { controller };
+  }
+
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' && !e.repeat) {
       e.preventDefault();

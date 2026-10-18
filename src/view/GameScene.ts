@@ -1,6 +1,7 @@
 import { Container, Graphics, Text } from 'pixi.js';
 import type { GameTextures } from './assets';
 import { Banner } from './Banner';
+import { FreeSpinsBar } from './FreeSpinsBar';
 import { HUD, type HudHandlers } from './HUD';
 import type { Layout } from './layout';
 import { ReelsView } from './ReelsView';
@@ -11,6 +12,8 @@ export class GameScene extends Container {
   readonly reels: ReelsView;
   readonly hud: HUD;
   readonly banner = new Banner();
+  readonly freeSpinsBar = new FreeSpinsBar();
+  private mode: 'base' | 'freeSpins' = 'base';
   /** Full-screen layer for bonus games, above the reels and HUD. */
   readonly overlay = new Container();
   private readonly backdrop = new Graphics();
@@ -32,7 +35,21 @@ export class GameScene extends Container {
       style: textStyle(COLORS.muted, 24, { fontFamily: 'sans-serif', letterSpacing: 0 }),
     });
     this.disclaimer.anchor.set(0.5, 1);
-    this.addChild(this.backdrop, this.title, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner);
+    this.freeSpinsBar.visible = false;
+    this.addChild(this.backdrop, this.title, this.freeSpinsBar, this.reels, ...this.hud.all, this.disclaimer, this.overlay, this.banner);
+  }
+
+  setMode(mode: 'base' | 'freeSpins'): void {
+    this.mode = mode;
+    this.freeSpinsBar.visible = mode === 'freeSpins';
+    this.title.visible = mode === 'base' || this.layout.mode === 'portrait';
+    this.drawBackdrop();
+  }
+
+  private drawBackdrop(): void {
+    const { width: W, height: H } = this.layout;
+    const color = this.mode === 'freeSpins' ? COLORS.night : COLORS.background;
+    this.backdrop.clear().rect(0, 0, W, H).fill(color);
   }
 
   arrange(layout: Layout): void {
@@ -41,7 +58,7 @@ export class GameScene extends Container {
     this.position.set(layout.offsetX, layout.offsetY);
     const { width: W, height: H } = layout;
     const hud = this.hud;
-    this.backdrop.clear().rect(0, 0, W, H).fill(COLORS.background);
+    this.drawBackdrop();
     this.title.position.set(W / 2, 14);
     this.disclaimer.position.set(W / 2, H - 14);
     this.banner.position.set(W / 2, H / 2 - 60);
@@ -51,6 +68,8 @@ export class GameScene extends Container {
       const left = (W - (ReelsView.outerWidth + spinColumn)) / 2 + 24;
       this.reels.scale.set(1);
       this.reels.position.set(left, 150);
+      this.freeSpinsBar.scale.set(1);
+      this.freeSpinsBar.position.set((W - FreeSpinsBar.barWidth) / 2, 4);
       hud.spin.position.set(left + ReelsView.outerWidth + spinColumn / 2 - 24, 150 + ReelsView.outerHeight / 2 - 24);
 
       const y = 150 + ReelsView.outerHeight + 10;
@@ -68,6 +87,8 @@ export class GameScene extends Container {
       const scale = (W - 80) / ReelsView.outerWidth;
       this.reels.scale.set(scale);
       this.reels.position.set(40 + 24 * scale, 300);
+      this.freeSpinsBar.scale.set((W - 40) / FreeSpinsBar.barWidth);
+      this.freeSpinsBar.position.set(20, 160);
       const below = 300 + ReelsView.outerHeight * scale + 40;
       const colW = 380;
       const gap = 40;

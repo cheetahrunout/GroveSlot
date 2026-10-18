@@ -63,3 +63,20 @@ export function buildStrip(counts: SymbolCounts, seed: number): SymbolId[] {
 export const BASE_REELS: readonly (readonly SymbolId[])[] = BASE_REEL_COUNTS.map((counts, i) =>
   buildStrip(counts, 0x620e5 + i),
 );
+
+/**
+ * Free-spin strips: no Lowriders or Palm G, more Spray Cans for tags, and
+ * any wild that lands expands to fill its reel.
+ */
+// Wilds only on reels 2 to 4, one each: expanding wilds are strong.
+export const FREE_SPIN_REEL_COUNTS: readonly SymbolCounts[] = [
+  { ...PAYING, WILD: 0, SCATTER: 2 },
+  { ...PAYING, WILD: 1, SCATTER: 2 },
+  { ...PAYING, WILD: 1, SCATTER: 2 },
+  { ...PAYING, WILD: 1, SCATTER: 2 },
+  { ...PAYING, WILD: 0, SCATTER: 2 },
+];
+
+export const FREE_SPIN_REELS: readonly (readonly SymbolId[])[] = FREE_SPIN_REEL_COUNTS.map((counts, i) =>
+  buildStrip(counts, 0xf5ee + i),
+);

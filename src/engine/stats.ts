@@ -1,17 +1,22 @@
-import type { RoundResult } from './round';
 import { createRng } from './rng';
-import { INITIAL_STATE, playRound } from './round';
+import { FEATURES, INITIAL_STATE, playRound, type FeatureKey } from './round';
 
 /** Where the RTP comes from, as fractions of the total amount bet. */
 export interface RtpBreakdown {
   rounds: number;
   rtp: number;
   base: number;
+  features: Record<FeatureKey, number>;
   hitRate: number;
   maxWinMultiplier: number;
   /** Rounds per trigger, keyed by feature. */
-  triggerEvery: Record<string, number>;
+  triggerEvery: Record<FeatureKey, number>;
+  /** Average feature payout in total bets, keyed by feature. */
+  averageAward: Record<FeatureKey, number>;
 }
+
+const perFeature = (value: number) =>
+  Object.fromEntries(FEATURES.map((f) => [f, value])) as Record<FeatureKey, number>;
 
 /** Runs `rounds` rounds from a seed and measures the game's maths. */
 export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdown {
@@ -22,30 +27,40 @@ export function simulate(rounds: number, seed: number, lineBet = 1): RtpBreakdow
   let base = 0;
   let hits = 0;
   let maxWin = 0;
-  const triggers: Record<string, number> = { freeSpins: 0, lowriderHop: 0, turfWar: 0 };
+  const featureWin = perFeature(0);
+  const featureCount = perFeature(0);
 
   for (let i = 0; i < rounds; i++) {
     const out = playRound(rng, state, lineBet);
     state = out.state;
-    const r: RoundResult = out.result;
+    const r = out.result;
     bet += r.totalBet;
     won += r.totalWin;
     base += r.base.totalWin;
     if (r.totalWin > 0) hits++;
     maxWin = Math.max(maxWin, r.totalWin / r.totalBet);
-    for (const key of Object.keys(triggers)) {
-      if (r.base.triggers[key as keyof typeof r.base.triggers]) triggers[key]++;
+    for (const f of FEATURES) {
+      const feature = r.features[f];
+      if (feature) {
+        featureCount[f]++;
+        featureWin[f] += feature.totalWin;
+      }
     }
   }
 
+  const totalBet = bet / rounds;
   return {
     rounds,
     rtp: won / bet,
     base: base / bet,
+    features: Object.fromEntries(FEATURES.map((f) => [f, featureWin[f] / bet])) as Record<FeatureKey, number>,
     hitRate: hits / rounds,
     maxWinMultiplier: maxWin,
     triggerEvery: Object.fromEntries(
-      Object.entries(triggers).map(([k, n]) => [k, n > 0 ? rounds / n : Infinity]),
-    ),
+      FEATURES.map((f) => [f, featureCount[f] > 0 ? rounds / featureCount[f] : Infinity]),
+    ) as Record<FeatureKey, number>,
+    averageAward: Object.fromEntries(
+      FEATURES.map((f) => [f, featureCount[f] > 0 ? featureWin[f] / featureCount[f] / totalBet : 0]),
+    ) as Record<FeatureKey, number>,
   };
 }

@@ -74,6 +74,20 @@ export class ReelsView extends Container {
     return view;
   }
 
+  /** Turns a whole reel wild, cell by cell, with a pop. */
+  async expandReel(reel: number): Promise<void> {
+    for (let row = 0; row < ROW_COUNT; row++) {
+      const view = this.setCell(reel, row, 'WILD');
+      const { x, y } = view.position;
+      view.pivot.set(CELL / 2, CELL / 2);
+      view.position.set(x + CELL / 2, y + CELL / 2);
+      view.scale.set(0.2);
+      await tween(view, { 'scale.x': 1, 'scale.y': 1 }, 220, easeOutBack);
+      view.pivot.set(0, 0);
+      view.position.set(x, y);
+    }
+  }
+
   cellPosition(reel: number, row: number): { x: number; y: number } {
     return { x: reel * STEP, y: row * STEP };
   }

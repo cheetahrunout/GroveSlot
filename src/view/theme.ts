@@ -2,6 +2,7 @@ import type { TextStyleOptions } from 'pixi.js';
 
 export const COLORS = {
   background: '#0d1a0d',
+  night: '#0b1426',
   panel: '#132613',
   panelEdge: '#3f8f3f',
   grove: '#2f7d2f',

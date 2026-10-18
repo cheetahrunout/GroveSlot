@@ -233,7 +233,7 @@ Prep before use:
 | 2 | **Engine core** ✅ | Reel strips, spin, line evaluation, paytable, bonus triggers; unit tests; wired into the placeholder screen |
 | 3 | **Simulator** ✅ | `npm run sim -- [rounds] [seed]` reports RTP, hit rate, biggest win and trigger rates; a 200k-round test guards the maths in CI |
 | 4 | **Base game UI** ✅ | Spinning reels with bounce, HUD (balance, bet −/+, win, auto-spin 10–100, turbo, space bar), win lines cycling with labels, saved wallet |
-| 5 | **Free Spins** | Scatter trigger, expanding wilds, Tag the Hood multiplier, retriggers |
+| 5 | **Free Spins** ✅ | Spray Can trigger (10/15/20 spins), night backdrop, expanding wilds, Tag the Hood wall raising the multiplier to ×5 with +2 spins per level, +10 retriggers, free-spin RTP ≈ 21% |
 | 6 | **Lowrider Hop** | Pick + timing mini-game scene |
 | 7 | **Hold & Spin + Jackpots** | Cash Bags, respins, 4 jackpot tiers |
 | 8 | **Turf War + Drive-By + Wanted Level** | Random features and wheel/map scene |
