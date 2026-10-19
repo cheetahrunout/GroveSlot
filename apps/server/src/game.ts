@@ -82,6 +82,8 @@ export class LowriderGame {
   private rateMicro: number | null = null;
   private controlReadAt = 0;
   private stopping = false;
+  /** Rounds a spin or a pick of this process is still playing: only that call may settle or void them. */
+  private readonly inFlight = new Set<string>();
 
   constructor(
     private readonly casino: Casino,
@@ -335,7 +337,8 @@ export class LowriderGame {
 
   /**
    * One paid round: open (debit), decide with the CSPRNG, settle (credit).
-   * The result is only returned once the casino confirmed the settle.
+   * The result is only returned once the casino confirmed the settle. Until then the round is in flight
+   * and reconcile() leaves it alone, however long the casino takes to answer.
    */
   private async playPaidRound<T>(
     s: PlayerSession,
@@ -344,6 +347,21 @@ export class LowriderGame {
     decide: () => { winCents: number; outcome: string; value: T },
   ): Promise<{ value: T; balance: Balance | null }> {
     const round = casinoRng.id();
+    this.inFlight.add(round);
+    try {
+      return await this.runPaidRound(round, s, betCents, meta, decide);
+    } finally {
+      this.inFlight.delete(round);
+    }
+  }
+
+  private async runPaidRound<T>(
+    round: string,
+    s: PlayerSession,
+    betCents: number,
+    meta: Record<string, unknown>,
+    decide: () => { winCents: number; outcome: string; value: T },
+  ): Promise<{ value: T; balance: Balance | null }> {
     const kind = String(meta.type);
     // Written before the casino is asked, so a crash at any point leaves a trace to clean up.
     this.journal.setRound(round, kind, 'opening');
@@ -417,13 +435,20 @@ export class LowriderGame {
   }
 
   /**
-   * After a restart (and on every heartbeat): void the rounds this server
-   * opened but never finished. The player saw no result for them, so a
-   * refund is the only safe ending; the casino also voids them after 6 h.
+   * After a restart, and every 30 s: void the rounds this server opened but
+   * never finished (a crash, or a void the casino did not answer). The player
+   * saw no result for them, so a refund is the only safe ending; the casino
+   * also voids them after 6 h. A round still in flight is not unfinished, it
+   * is waiting for the casino: voiding it would cancel a spin, and whatever it
+   * won, while it plays.
    */
   async reconcile(): Promise<number> {
     let cleaned = 0;
     for (const { id, kind } of this.journal.unfinishedRounds()) {
+      // Checked per round: the list is read once and a spin may finish while an earlier void is waiting.
+      if (this.inFlight.has(id)) continue;
+      const status = this.journal.roundStatus(id);
+      if (status !== 'opening' && status !== 'open') continue;
       if (await this.voidAndRecord(id, kind, 'restart')) cleaned++;
     }
     if (cleaned > 0) this.log('reconciled', { rounds: cleaned });
