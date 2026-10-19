@@ -18,10 +18,10 @@ export function euroShort(cents: number): string {
   return Number.isInteger(e) ? `€\u00a0${e}` : euro(cents);
 }
 
-/** A token balance: four decimals, always rounded down (0,05199 tok shows as 0,0519 tok). */
+/** A token balance: whole tokens, fraction dropped (12.9999 → 12 tok). Never decimals. */
 export function tokens(micro: number): string {
-  const floored = Math.floor(micro / 100) / 10_000;
-  return `${floored.toLocaleString('nl-NL', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} tok`;
+  const whole = Math.floor(micro / 1_000_000);
+  return `${whole.toLocaleString('nl-NL')} tok`;
 }
 
 export function bagLabel(bag: CashBag): string {

@@ -20,5 +20,6 @@
       "default": true
     }
   ],
-  "health_url": "/health"
+  "health_url": "/health",
+  "round_name": "spin"
 }
