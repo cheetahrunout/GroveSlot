@@ -177,6 +177,7 @@ export class GameController {
     timing.speed = this.store.turbo ? 2.2 : 1;
   }
 
+  /** `count` may be Infinity: spins until stopped. */
   startAuto(count: number): void {
     if (!this.store.canSpin) return;
     this.store.autoRemaining = count;

@@ -4,7 +4,12 @@ import { CONTROLLER } from '../game/injection';
 import { useGameStore } from '../stores/game';
 import { euro, tokens } from '../view/format';
 
-const AUTO_OPTIONS = [10, 25, 50, 100] as const;
+function autoLabel(n: number): string {
+  return Number.isFinite(n) ? String(n) : '∞';
+}
+
+// Infinity runs until stopped (or a bonus or big win stops it).
+const AUTO_OPTIONS = [10, 25, 50, 100, Infinity] as const;
 const store = useGameStore();
 const controller = inject(CONTROLLER)!;
 const autoMenu = ref(false);
@@ -55,11 +60,11 @@ function startAuto(n: number): void {
     <div class="toggles">
       <div class="auto-wrap">
         <button class="g-button" :class="{ 'is-on': store.autoRemaining !== null }" :aria-expanded="autoMenu" @click="toggleAuto">
-          {{ store.autoRemaining !== null ? `STOP ${store.autoRemaining}` : 'AUTO' }}
+          {{ store.autoRemaining !== null ? `STOP ${autoLabel(store.autoRemaining)}` : 'AUTO' }}
         </button>
         <div v-if="autoMenu" class="auto-menu" role="menu">
-          <button v-for="n in AUTO_OPTIONS" :key="n" class="g-button is-plain" role="menuitem" :disabled="!store.canSpin" @click="startAuto(n)">
-            {{ n }}
+          <button v-for="n in AUTO_OPTIONS" :key="n" class="g-button is-plain" role="menuitem" :aria-label="Number.isFinite(n) ? undefined : 'Unlimited'" :disabled="!store.canSpin" @click="startAuto(n)">
+            {{ autoLabel(n) }}
           </button>
         </div>
       </div>
