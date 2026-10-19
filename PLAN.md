@@ -83,7 +83,7 @@ Lowrider now runs as a Grove Casino game under the casino's integration guide (`
 
 ### Bet settings
 - Bet per line: 1, 2, 5, 10, 25 tokens → total bet 20–500.
-- Auto-spin (10/25/50/100/unlimited, stops on any bonus or a big win) and a Turbo toggle.
+- Auto-spin (10/25/50/100/unlimited, stops on any bonus or a big win unless "don't stop" is ticked, off by default) and a Turbo toggle.
 
 ### Target math (for fun, but keep it honest)
 - Target **RTP ≈ 96%**, medium volatility, hit rate ≈ 25–30%.

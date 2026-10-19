@@ -52,6 +52,8 @@ export const useGameStore = defineStore('game', {
     win: null as number | null,
     busy: false,
     autoRemaining: null as number | null,
+    /** Auto-spin keeps going through bonuses and big wins. */
+    autoNonStop: false,
     turbo: false,
     mode: 'base' as UiMode,
     freeSpins: null as FreeSpinsHud | null,

@@ -66,6 +66,14 @@ function startAuto(n: number): void {
           <button v-for="n in AUTO_OPTIONS" :key="n" class="g-button is-plain" role="menuitem" :aria-label="Number.isFinite(n) ? undefined : 'Unlimited'" :disabled="!store.canSpin" @click="startAuto(n)">
             {{ autoLabel(n) }}
           </button>
+          <button
+            class="g-button is-plain non-stop"
+            role="menuitemcheckbox"
+            :aria-checked="store.autoNonStop"
+            @click="store.autoNonStop = !store.autoNonStop"
+          >
+            {{ store.autoNonStop ? '☑' : '☐' }} Don't stop on bonus or big win
+          </button>
         </div>
       </div>
       <button class="g-button" :class="{ 'is-on': store.turbo }" :aria-pressed="store.turbo" @click="controller.toggleTurbo()">TURBO</button>
@@ -138,6 +146,10 @@ function startAuto(n: number): void {
 
 .auto-wrap {
   position: relative;
+}
+.non-stop {
+  white-space: nowrap;
+  text-align: left;
 }
 
 .auto-menu {
