@@ -95,7 +95,7 @@ export interface TableReport {
   meta?: Meta;
 }
 
-export interface Heartbeat { version?: string; players?: number; tables?: TableReport[]; }
+export interface Heartbeat { version?: string; players?: number; sessions?: string[]; tables?: TableReport[]; }
 
 /** the object watch() keeps current; read status, settings and limits from it before every round */
 export interface WatchState {
