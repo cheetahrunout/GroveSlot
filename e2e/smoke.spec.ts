@@ -18,8 +18,8 @@ test('the page loads, spins once and settles', async ({ page }) => {
   await page.goto('/');
   const hud = page.getByRole('region', { name: 'Game controls' });
   const balance = hud.locator('.balance .value');
-  // Tokens, four decimals, Dutch style (the euro value sits next to it).
-  await expect(balance).toHaveText(/^[\d.]+,\d{4} tok$/, { timeout: 30_000 });
+  // Whole tokens, Dutch thousands separator, no decimals (the euro value sits next to it).
+  await expect(balance).toHaveText(/^\d{1,3}(\.\d{3})* tok$/, { timeout: 30_000 });
   await expect(hud.locator('.balance .worth')).toHaveText(/^worth €\s[\d.]+,\d{2}$/);
   const before = await balance.textContent();
 
