@@ -43,7 +43,7 @@ function createCasino(opts) {
         voidRound: a => call('POST', '/api/game/round/void', { round: a.round, reason: a.reason }),
         // multiplayer: report every table whenever its seats or status change (and in the heartbeat)
         table: a => call('POST', '/api/game/table', { table: a.table, seats_max: a.seatsMax, seats_used: a.seatsUsed, status: a.status, players: a.players, meta: a.meta }),
-        heartbeat: a => call('POST', '/api/game/heartbeat', { version: a && a.version, players: a && a.players, tables: a && a.tables }),
+        heartbeat: a => call('POST', '/api/game/heartbeat', { version: a && a.version, players: a && a.players, sessions: a && a.sessions, tables: a && a.tables }),
         control: () => call('GET', '/api/game/control'),
         score: a => call('POST', '/api/game/score', { session: a.session, score: a.score, meta: a.meta }),
         // the control stream: 'control' events carry {status, settings, limits}; call handler(type, data)
