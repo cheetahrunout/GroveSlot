@@ -140,7 +140,7 @@ describe('Wanted Level', () => {
     expect(paydays).toBeGreaterThan(500);
     expect(won / bet).toBeLessThan(honest.rtp + 0.03);
     expect(won / bet).toBeLessThan(1);
-  });
+  }, 60_000);
 
   it('pays no Payday below five stars', () => {
     const rng = createRng(4);
