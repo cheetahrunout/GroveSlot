@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createRng } from '@lowrider/shared/engine/rng';
-import { buildApp } from '../src/app';
+import { ACTIONS_PER_MINUTE, buildApp } from '../src/app';
 import { FakeCasino } from '../src/fakeCasino';
 import { LowriderGame, startGame } from '../src/game';
 import { Journal } from '../src/journal';
@@ -108,14 +108,16 @@ describe('production mode', () => {
     expect(res.statusCode).toBe(404);
   });
 
-  it('rate-limits game actions', async () => {
+  it('lets turbo auto-spin run flat out and still rate-limits a script', async () => {
     const cookie = await login();
     const codes: number[] = [];
-    for (let i = 0; i < 95; i++) {
-      codes.push((await app.inject({ method: 'POST', url: '/api/collect', payload: {}, headers: { cookie } })).statusCode);
+    for (let i = 0; i < ACTIONS_PER_MINUTE + 10; i++) {
       codes.push((await app.inject({ method: 'POST', url: '/api/spin', payload: { betCents: 20 }, headers: { cookie } })).statusCode);
     }
-    expect(codes).toContain(429);
+    // A minute of turbo auto-spin is about 110 spins (0.55 s a losing spin): every one of them plays.
+    expect(ACTIONS_PER_MINUTE).toBeGreaterThan(110);
+    expect(codes.slice(0, ACTIONS_PER_MINUTE).every((c) => c === 200)).toBe(true);
+    expect(codes.slice(ACTIONS_PER_MINUTE)).toContain(429);
   });
 });
 

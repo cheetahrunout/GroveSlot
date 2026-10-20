@@ -202,6 +202,30 @@ describe('spins', () => {
     expect(casino.scores[0].score).toBeGreaterThanOrEqual(200);
   });
 
+  it('never voids a spin that is still waiting for the casino', async () => {
+    const { game, casino, journal } = await setup();
+    const s = await game.openSession('cj');
+    // The casino is slow to answer the settle, and the 30 s housekeeping runs in between.
+    let answer!: () => void;
+    let waiting = false;
+    const held = new Promise<void>((r) => (answer = r));
+    const settle = casino.settle.bind(casino);
+    casino.settle = async (a) => {
+      waiting = true;
+      await held;
+      return settle(a);
+    };
+    const spinning = game.spin(s, 20);
+    while (!waiting) await flush();
+    expect(journal.unfinishedRounds()).toHaveLength(1);
+    expect(await game.reconcile()).toBe(0);
+    answer();
+    await expect(spinning).resolves.toBeDefined();
+    expect([...casino.rounds.values()][0].round.status).toBe('settled');
+    expect(casino.calls).not.toContain('voidRound');
+    expect(journal.unfinishedRounds()).toHaveLength(0);
+  });
+
   it('drains rounds in flight before a shutdown and refuses new ones', async () => {
     const { game } = await setup();
     const s = await game.openSession('cj');
