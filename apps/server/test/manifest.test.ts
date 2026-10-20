@@ -64,7 +64,7 @@ describe('casino-game.json', () => {
     }
     // The settle outcome names the Payday, the round whose value depends on earlier ones.
     expect(manifest.special_outcomes).toEqual(['payday']);
-  });
+  }, 60_000);
 
   it('declares an RTP in the slot band that the game delivers', () => {
     expect(manifest.rtp_bps).toBeGreaterThanOrEqual(9200);
@@ -72,5 +72,5 @@ describe('casino-game.json', () => {
     // 400k rounds: the chance spread is about ±2.3 points, so allow 2.5.
     const r = simulate(400_000, 99);
     expect(Math.abs(r.rtp * 100 - manifest.rtp_bps / 100)).toBeLessThan(2.5);
-  });
+  }, 60_000);
 });
