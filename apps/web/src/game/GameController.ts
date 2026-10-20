@@ -24,7 +24,7 @@ import { presentTurfWar } from './presenters/turfWar';
 import { createAsk } from './prompt';
 import type { UiPort } from './ui';
 
-/** Big wins stop auto-spin, as a multiple of the total bet. */
+/** Big wins stop auto-spin (unless the player chose non-stop), as a multiple of the total bet. */
 const AUTO_STOP_WIN = 25;
 const BET_PREF_KEY = 'groveslot:betCents';
 
@@ -184,6 +184,7 @@ export class GameController {
     timing.speed = this.store.turbo ? 2.2 : 1;
   }
 
+  /** `count` may be Infinity: spins until stopped. */
   startAuto(count: number): void {
     if (!this.store.canSpin) return;
     this.store.autoRemaining = count;
@@ -206,7 +207,8 @@ export class GameController {
       }
       store.autoRemaining--;
       const result = await this.spin();
-      if (!result || result.totalWin >= result.totalBet * AUTO_STOP_WIN) break;
+      if (!result || (!store.autoNonStop && this.stopsAuto(result))) break;
+      // The loss limit holds whatever the player chose about bonuses and big wins.
       net += result.totalWin - result.totalBet;
       if (-net >= limit) {
         store.toast('AUTO STOPPED', `Loss limit of ${euro(limit)} reached`);
@@ -215,6 +217,13 @@ export class GameController {
       await wait(result.totalWin > 0 ? 700 : 250);
     }
     this.stopAuto();
+  }
+
+  /** A bonus or a big win ends auto-spin, unless the player chose non-stop. */
+  private stopsAuto(result: RoundResult): boolean {
+    const { freeSpins, lowriderHop, holdAndSpin, turfWar } = result.features;
+    const bonus = !!(freeSpins || lowriderHop || holdAndSpin || turfWar);
+    return bonus || result.totalWin >= result.totalBet * AUTO_STOP_WIN;
   }
 
   /** Runs `task` with the controls locked. */

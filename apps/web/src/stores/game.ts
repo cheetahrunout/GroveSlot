@@ -58,6 +58,8 @@ export const useGameStore = defineStore('game', {
     autoRemaining: null as number | null,
     /** Auto-spin stops once it has lost this many total bets (null: no limit). */
     autoLossLimit: 50 as number | null,
+    /** Auto-spin keeps going through bonuses and big wins. */
+    autoNonStop: false,
     turbo: false,
     mode: 'base' as UiMode,
     freeSpins: null as FreeSpinsHud | null,

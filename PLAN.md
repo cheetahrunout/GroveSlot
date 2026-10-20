@@ -84,7 +84,7 @@ Lowrider now runs as a Grove Casino game under the casino's integration guide (`
 
 ### Bet settings
 - Bet per line: 1, 2, 5, 10, 25 tokens → total bet 20–500.
-- Auto-spin (10/25/50/100, stops on any bonus or a big win) and a Turbo toggle.
+- Auto-spin (10/25/50/100/unlimited, stops on any bonus or a big win unless "don't stop" is ticked, off by default) and a Turbo toggle.
 
 ### Target math (for fun, but keep it honest)
 - Target **RTP ≈ 96%**, medium volatility, hit rate ≈ 25–30%.
@@ -235,7 +235,7 @@ Prep before use:
 | 1 | **Scaffold** ✅ | Vite + TS + Pixi + Vitest, CI running tests, seeded RNG, layout system, leaderboard interface, placeholder grid |
 | 2 | **Engine core** ✅ | Reel strips, spin, line evaluation, paytable, bonus triggers; unit tests; wired into the placeholder screen |
 | 3 | **Simulator** ✅ | `npm run sim -- [rounds] [seed]` reports RTP, hit rate, biggest win and trigger rates; a 200k-round test guards the maths in CI |
-| 4 | **Base game UI** ✅ | Spinning reels with bounce, HUD (balance, bet −/+, win, auto-spin 10–100, turbo, space bar), win lines cycling with labels, saved wallet |
+| 4 | **Base game UI** ✅ | Spinning reels with bounce, HUD (balance, bet −/+, win, auto-spin 10–100 or unlimited, turbo, space bar), win lines cycling with labels, saved wallet |
 | 5 | **Free Spins** ✅ | Spray Can trigger (10/15/20 spins), night backdrop, expanding wilds, Tag the Hood wall raising the multiplier to ×5 with +2 spins per level, +10 retriggers, free-spin RTP ≈ 21% |
 | 6 | **Lowrider Hop** ✅ | Pick 1 of 3 lowriders (cosmetic), 5 hops drawn from a weighted ×2–×50 table when the bonus triggers; HOP only plays the next animation; ≈ 7% RTP |
 | 7 | **Hold & Spin + Jackpots** ✅ | Stacked Cash Bags with values, 6+ start Cash Run: 3 respins that reset on every new bag, collect screen, Homie/Soldier/OG bag jackpots, Kingpin (1,000× + pot) for all 15 cells, jackpot meter, saved pot; ≈ 7.7% RTP |

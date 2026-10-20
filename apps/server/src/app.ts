@@ -33,6 +33,13 @@ export interface AppOptions {
 }
 
 /**
+ * Spins and Car Chase picks per seat per minute. A seat's rounds already run one at a time (a second one is
+ * refused as busy); the page at its fastest spins about 110 times a minute on turbo auto-spin (0.55 s a losing
+ * spin) and about 170 by hand on turbo, so the limit sits above both and still stops a script.
+ */
+export const ACTIONS_PER_MINUTE = 240;
+
+/**
  * The seat a request speaks for: the tab's `X-Lowrider-Seat` header, or `?seat=` on the event stream and the
  * leave beacon (neither can carry a header). A player may hold several seats at once (one per tab), and tabs
  * share cookies, so the seat is never kept in a cookie (rule 9): a page without storage keeps it in memory.
@@ -150,7 +157,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
 
   app.get('/api/state', async (req) => welcome(sessionOf(req)));
 
-  const actionLimit = { rateLimit: { max: 90, timeWindow: '1 minute' } };
+  const actionLimit = { rateLimit: { max: ACTIONS_PER_MINUTE, timeWindow: '1 minute' } };
 
   app.post('/api/spin', { config: actionLimit }, async (req) => {
     const s = requireSession(req);

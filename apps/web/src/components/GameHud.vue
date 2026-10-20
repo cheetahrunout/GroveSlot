@@ -4,7 +4,12 @@ import { CONTROLLER } from '../game/injection';
 import { useGameStore } from '../stores/game';
 import { euro, tokens } from '../view/format';
 
-const AUTO_OPTIONS = [10, 25, 50, 100] as const;
+function autoLabel(n: number): string {
+  return Number.isFinite(n) ? String(n) : '∞';
+}
+
+// Infinity runs until stopped (or a bonus, a big win or the loss limit stops it).
+const AUTO_OPTIONS = [10, 25, 50, 100, Infinity] as const;
 /** Auto-spin loss limits, in total bets. */
 const LOSS_LIMITS = [10, 25, 50, 100] as const;
 const store = useGameStore();
@@ -57,7 +62,7 @@ function startAuto(n: number): void {
     <div class="toggles">
       <div class="auto-wrap">
         <button class="g-button" :class="{ 'is-on': store.autoRemaining !== null }" :aria-expanded="autoMenu" @click="toggleAuto">
-          {{ store.autoRemaining !== null ? `STOP ${store.autoRemaining}` : 'AUTO' }}
+          {{ store.autoRemaining !== null ? `STOP ${autoLabel(store.autoRemaining)}` : 'AUTO' }}
         </button>
         <div v-if="autoMenu" class="auto-menu" role="menu">
           <label class="limit">
@@ -67,8 +72,16 @@ function startAuto(n: number): void {
               <option :value="null">NO LIMIT</option>
             </select>
           </label>
-          <button v-for="n in AUTO_OPTIONS" :key="n" class="g-button is-plain" role="menuitem" :disabled="!store.canSpin" @click="startAuto(n)">
-            {{ n }} SPINS
+          <button v-for="n in AUTO_OPTIONS" :key="n" class="g-button is-plain" role="menuitem" :aria-label="Number.isFinite(n) ? undefined : 'Unlimited'" :disabled="!store.canSpin" @click="startAuto(n)">
+            {{ autoLabel(n) }}
+          </button>
+          <button
+            class="g-button is-plain non-stop"
+            role="menuitemcheckbox"
+            :aria-checked="store.autoNonStop"
+            @click="store.autoNonStop = !store.autoNonStop"
+          >
+            {{ store.autoNonStop ? '☑' : '☐' }} Don't stop on bonus or big win
           </button>
         </div>
       </div>
@@ -142,6 +155,10 @@ function startAuto(n: number): void {
 
 .auto-wrap {
   position: relative;
+}
+.non-stop {
+  white-space: nowrap;
+  text-align: left;
 }
 
 .auto-menu {

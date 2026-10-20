@@ -428,7 +428,8 @@ export class LowriderGame {
 
   /**
    * One paid round: open (debit), decide with the CSPRNG, settle (credit).
-   * The result is only returned once the casino confirmed the settle.
+   * The result is only returned once the casino confirmed the settle. Until then the round is in flight
+   * and reconcile() leaves it alone, however long the casino takes to answer.
    */
   private async playPaidRound<T>(
     s: PlayerSession,
@@ -536,13 +537,17 @@ export class LowriderGame {
    * but did not finish. A decided round is settled with its recorded win
    * (rule 11: settles are retried until the casino answers). A round that
    * was never decided showed the player nothing, so it is voided and the bet
-   * refunded; the casino also voids them after 6 h.
+   * refunded; the casino also voids them after 6 h. A round still in flight
+   * is waiting for the casino, not unfinished: it is left to the call playing it.
    */
   async reconcile(): Promise<number> {
     let cleaned = 0;
     for (const r of this.journal.unfinishedRounds()) {
+      // Checked per round: the list is read once and a spin may finish while an earlier call is waiting.
       if (this.inFlight.has(r.id)) continue;
-      if (r.status === 'decided' && r.winCents !== null) {
+      const status = this.journal.roundStatus(r.id);
+      if (status !== 'opening' && status !== 'open' && status !== 'decided') continue;
+      if (status === 'decided' && r.winCents !== null) {
         if (await this.settleRecorded(r.id, r.kind, r.winCents, r.outcome ?? '')) cleaned++;
       } else if (await this.voidAndRecord(r.id, r.kind, 'restart')) cleaned++;
     }
