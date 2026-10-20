@@ -38,6 +38,34 @@ describe('casino-game.json', () => {
     }
   });
 
+  it('publishes the odds the casino checks the record against (integration 0.34.0)', () => {
+    const r = simulate(400_000, 99);
+    // rtp_sd: the spread of one round's return, in bets.
+    expect(Math.abs(manifest.rtp_sd - r.stdDev)).toBeLessThan(1);
+    const shares: Record<string, number> = {
+      'Free Spins': r.features.freeSpins,
+      'Cash Run': r.features.holdAndSpin,
+      'Lowrider Hop': r.features.lowriderHop,
+      'Turf War': r.features.turfWar,
+      'Wanted Payday': r.payday,
+    };
+    const every: Record<string, number> = {
+      'Free Spins': r.triggerEvery.freeSpins,
+      'Cash Run': r.triggerEvery.holdAndSpin,
+      'Lowrider Hop': r.triggerEvery.lowriderHop,
+      'Turf War': r.triggerEvery.turfWar,
+      'Wanted Payday': r.paydayEvery,
+    };
+    expect(manifest.features.map((f: { name: string }) => f.name).sort()).toEqual(Object.keys(shares).sort());
+    for (const f of manifest.features as { name: string; every: number; rtp_bps: number; max_x: number }[]) {
+      expect(Math.abs(f.rtp_bps / 10_000 - shares[f.name])).toBeLessThan(0.012);
+      expect(Math.abs(f.every / every[f.name] - 1)).toBeLessThan(0.15);
+      expect(f.max_x).toBeLessThanOrEqual(5000);
+    }
+    // The settle outcome names the Payday, the round whose value depends on earlier ones.
+    expect(manifest.special_outcomes).toEqual(['payday']);
+  });
+
   it('declares an RTP in the slot band that the game delivers', () => {
     expect(manifest.rtp_bps).toBeGreaterThanOrEqual(9200);
     expect(manifest.rtp_bps).toBeLessThanOrEqual(9700);

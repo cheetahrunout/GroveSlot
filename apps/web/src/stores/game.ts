@@ -48,10 +48,18 @@ export const useGameStore = defineStore('game', {
     betCents: 0,
     gambleOffer: null as { stake: number } | null,
     wantedStars: 0,
+    /** The bet a Payday is paid on: the smallest bet played while the meter filled. */
+    wantedBet: 0,
+    /** A refusal that blocks play, such as the seat limit; shown with the way back to the lobby. */
+    notice: null as { title: string; body: string } | null,
     /** Running win of the current round, in euro cents. */
     win: null as number | null,
     busy: false,
     autoRemaining: null as number | null,
+    /** Auto-spin stops once it has lost this many total bets (null: no limit). */
+    autoLossLimit: 50 as number | null,
+    /** Auto-spin keeps going through bonuses and big wins. */
+    autoNonStop: false,
     turbo: false,
     mode: 'base' as UiMode,
     freeSpins: null as FreeSpinsHud | null,
@@ -82,6 +90,7 @@ export const useGameStore = defineStore('game', {
     },
     statusMessage(state): StatusMessage | null {
       const lobbyUrl = state.casinoUrl;
+      if (state.notice) return { mode: 'full', ...state.notice, lobbyUrl };
       if (!state.connected) return null;
       if (state.status === 'closed') {
         return { mode: 'full', title: 'Closed', body: state.reason || 'Lowrider is closed right now. Any open round was refunded.', lobbyUrl };

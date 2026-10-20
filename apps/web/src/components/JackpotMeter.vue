@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import kingpinArt from '../assets/symbols/kingpin-crown-g.jpg';
 import { useGameStore } from '../stores/game';
-import { euroShort } from '../view/format';
+import { euro } from '../view/format';
 
 const store = useGameStore();
 </script>
@@ -11,13 +11,31 @@ const store = useGameStore();
     <li v-for="j in store.jackpots" :key="j.id" class="jackpot" :class="{ 'is-kingpin': j.id === 'kingpin' }">
       <img v-if="j.id === 'kingpin'" :src="kingpinArt" alt="" class="crown" />
       <span class="name">{{ j.name }}</span>
-      <span class="value">{{ euroShort(j.cents) }}</span>
+      <span class="value">{{ euro(j.cents) }}</span>
     </li>
   </ul>
 </template>
 
 <style scoped>
+/*
+ * The type sizes follow the HUD (cqmin of the game container), computed once on the meter so that each
+ * jackpot box can be a container of its own: the full amount (€ 5.000,00) shrinks to fit its box, never clipped.
+ */
+@property --jackpot-name {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 14px;
+}
+
+@property --jackpot-value {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 22px;
+}
+
 .jackpots {
+  --jackpot-name: clamp(11px, 1.7cqmin, 18px);
+  --jackpot-value: clamp(16px, 2.8cqmin, 32px);
   display: grid;
   /* The Kingpin also carries its crown. */
   grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.5fr);
@@ -28,6 +46,7 @@ const store = useGameStore();
 }
 
 .jackpot {
+  container-type: inline-size;
   position: relative;
   display: grid;
   justify-items: center;
@@ -56,9 +75,14 @@ const store = useGameStore();
 }
 
 .name {
-  font-size: clamp(11px, 1.7cqmin, 18px);
+  font-size: var(--jackpot-name);
   color: var(--grove-color-muted);
   letter-spacing: 0.06em;
+}
+
+.is-kingpin .value {
+  /* The crown takes part of the box. */
+  font-size: min(var(--jackpot-value), 14cqi);
 }
 
 .is-kingpin .name {
@@ -66,7 +90,7 @@ const store = useGameStore();
 }
 
 .value {
-  font-size: clamp(16px, 2.8cqmin, 32px);
+  font-size: min(var(--jackpot-value), 21cqi);
   color: var(--grove-color-gold);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;

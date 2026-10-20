@@ -67,6 +67,8 @@ export interface PublicState {
   player: { name: string } | null;
   balance: Balance | null;
   wantedStars: number;
+  /** The bet a Payday is paid on: the smallest total bet (euro cents) played since the meter was last empty; 0 when empty. */
+  wantedBet: number;
   gamble: { stake: number } | null;
 }
 

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { PAYLINES } from '@lowrider/shared/config/paylines';
 import { centsToMicro } from '../src/fakeCasino';
-import { GameError, betOptions } from '../src/game';
+import { WANTED } from '@lowrider/shared/config/features';
+import { GameError, betOptions, outcomeOf } from '../src/game';
 import { cryptoRng } from '../src/rng';
 import { flush, setup } from './helpers';
 
@@ -32,9 +33,30 @@ describe('sessions', () => {
 });
 
 describe('heartbeat and control', () => {
-  it('heartbeats at once with the version and the player count', async () => {
+  it('heartbeats at once with the version, the player count and the sessions held', async () => {
     const { casino } = await setup();
-    expect(casino.heartbeats[0]).toEqual({ version: '1.0.42', players: 0 });
+    expect(casino.heartbeats[0]).toEqual({ version: '1.0.42', players: 0, sessions: [] });
+  });
+
+  it('counts only players with something in progress, never idle seats (rule 17)', async () => {
+    const { game } = await setup();
+    const a = await game.openSession('cj');
+    const b = await game.openSession('cj');
+    expect(game.openCasinoSessions()).toHaveLength(2);
+    expect(game.activePlayers()).toBe(0);
+    // A spin in flight counts its player once, however many seats they hold.
+    const spinning = game.spin(a, 20);
+    expect(game.activePlayers()).toBe(1);
+    await spinning;
+    // A Car Chase offer on screen counts; collecting it ends it.
+    a.gamble = { original: 20, stake: 20, rounds: 0 };
+    b.featureUntil = Date.now() + 60_000;
+    expect(game.activePlayers()).toBe(1);
+    game.collect(a);
+    expect(game.activePlayers()).toBe(1);
+    // A bonus being played back counts until the page says it is done.
+    game.featureShown(b);
+    expect(game.activePlayers()).toBe(0);
   });
 
   it('reads the reason players see from the casino', async () => {
@@ -98,14 +120,39 @@ describe('spins', () => {
     expect(casino.wallets.get('player-cj')).toBe(start - centsToMicro(20) + centsToMicro(result.totalWin));
   });
 
-  it('voids the round and refunds the bet when the settle never goes through', async () => {
+  it('keeps retrying the settle until the casino answers, and pays the decided win (rule 11)', async () => {
+    const { game, casino } = await setup();
+    game.backoffMs = () => 1;
+    const s = await game.openSession('cj');
+    const start = casino.wallets.get('player-cj')!;
+    casino.failNext = { settle: 40 };
+    const { result } = await game.spin(s, 20);
+    expect(casino.calls.filter((c) => c === 'settle')).toHaveLength(41);
+    expect([...casino.rounds.values()][0].round).toMatchObject({ status: 'settled', win_cents: result.totalWin });
+    expect(casino.wallets.get('player-cj')).toBe(start - centsToMicro(20) + centsToMicro(result.totalWin));
+  });
+
+  it('voids the round and refunds the bet when the casino refuses the settle itself', async () => {
     const { game, casino } = await setup();
     const s = await game.openSession('cj');
     const start = casino.wallets.get('player-cj');
-    casino.failNext = { settle: 99 };
+    casino.settle = async () => {
+      throw new casino.CasinoError('win above limit', 400, { error: 'win above limit' });
+    };
     await expect(game.spin(s, 20)).rejects.toMatchObject({ code: 'round_voided' });
     expect(casino.wallets.get('player-cj')).toBe(start);
     expect([...casino.rounds.values()][0].round.status).toBe('void');
+  });
+
+  it('names the Payday and the Drive-By in the outcome the casino records', async () => {
+    const { game, casino, journal } = await setup({ devMode: true });
+    const s = await game.openSession('cj');
+    journal.saveState('1', { wanted: { stars: WANTED.maxStars, lossStreak: 0, bet: 20 } });
+    const { result } = await game.spin(s, 20, 'driveBy');
+    expect(result.payday).toBeGreaterThan(0);
+    const outcome = [...casino.rounds.values()][0].round.outcome!;
+    expect(outcome).toBe(outcomeOf(result));
+    expect(outcome.split('+')).toEqual(expect.arrayContaining(['driveBy', 'payday']));
   });
 
   it('obeys maintenance and closed at once', async () => {
@@ -202,6 +249,30 @@ describe('spins', () => {
     expect(casino.scores[0].score).toBeGreaterThanOrEqual(200);
   });
 
+  it('never voids a spin that is still waiting for the casino', async () => {
+    const { game, casino, journal } = await setup();
+    const s = await game.openSession('cj');
+    // The casino is slow to answer the settle, and the 30 s housekeeping runs in between.
+    let answer!: () => void;
+    let waiting = false;
+    const held = new Promise<void>((r) => (answer = r));
+    const settle = casino.settle.bind(casino);
+    casino.settle = async (a) => {
+      waiting = true;
+      await held;
+      return settle(a);
+    };
+    const spinning = game.spin(s, 20);
+    while (!waiting) await flush();
+    expect(journal.unfinishedRounds()).toHaveLength(1);
+    expect(await game.reconcile()).toBe(0);
+    answer();
+    await expect(spinning).resolves.toBeDefined();
+    expect([...casino.rounds.values()][0].round.status).toBe('settled');
+    expect(casino.calls).not.toContain('voidRound');
+    expect(journal.unfinishedRounds()).toHaveLength(0);
+  });
+
   it('drains rounds in flight before a shutdown and refuses new ones', async () => {
     const { game } = await setup();
     const s = await game.openSession('cj');
@@ -209,6 +280,50 @@ describe('spins', () => {
     await game.drain();
     await expect(spinning).resolves.toBeDefined();
     await expect(game.spin(s, 20)).rejects.toMatchObject({ code: 'restarting' });
+  });
+});
+
+describe('the Wanted Payday across tabs (F2)', () => {
+  async function fullMeterTabs(tabs: number) {
+    const { game, casino, journal } = await setup();
+    const seats = [];
+    for (let i = 0; i < tabs; i++) seats.push(await game.openSession('cj'));
+    journal.saveState('1', { wanted: { stars: WANTED.maxStars, lossStreak: 0, bet: 20 } });
+    return { game, casino, journal, seats };
+  }
+
+  for (const tabs of [2, 5]) {
+    it(`pays one Payday from one full meter when ${tabs} tabs spin at the same moment`, async () => {
+      for (let trial = 0; trial < 20; trial++) {
+        const { game, seats } = await fullMeterTabs(tabs);
+        const results = await Promise.all(seats.map((s) => game.spin(s, 20)));
+        expect(results.filter((r) => r.result.payday > 0)).toHaveLength(1);
+      }
+    });
+  }
+
+  it('returns no more on five tabs than on one at a fixed bet', async () => {
+    const { game, casino, seats } = await fullMeterTabs(5);
+    casino.wallets.set('player-cj', Number.MAX_SAFE_INTEGER / 4);
+    let bet = 0;
+    let payday = 0;
+    // Fill the meter on one tab, then play the payday spin on all five at once (115% before the fix).
+    for (let i = 0; i < 6000; i++) {
+      const full = game.publicState(seats[0]).wantedStars >= WANTED.maxStars;
+      for (const { result } of await Promise.all((full ? seats : seats.slice(0, 1)).map((s) => game.spin(s, 20)))) {
+        bet += result.totalBet;
+        payday += result.payday;
+      }
+    }
+    // One meter, one Payday: about 5% of stakes, as on one tab (about 20% before the fix).
+    expect(payday / bet).toBeLessThan(0.08);
+  }, 60_000);
+
+  it('does not let one tab run ahead of the queue', async () => {
+    const { game, seats } = await fullMeterTabs(1);
+    const first = game.spin(seats[0], 20);
+    await expect(game.spin(seats[0], 20)).rejects.toMatchObject({ code: 'busy' });
+    await first;
   });
 });
 

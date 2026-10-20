@@ -30,6 +30,7 @@ Lowrider now runs as a Grove Casino game under the casino's integration guide (`
 - Manifest `casino-game.json` (RTP 96.00%), Dockerfile and a GHCR image workflow. GitHub Pages hosting was dropped, because the page needs the server.
 - **The casino SDK and money on screen.** The server uses `sdk/casino-game.js` verbatim (calls, `watch()`, `rng`), follows the casino's states `open`, `demo`, `maintenance` and `closed`, handles `offline` and refunded rounds, and sends players without a session back through `/play/lowrider`. The page carries the casino bar loader (`bar.js`, written into the page by the server), lays itself out inside `--grove-bar-*`, shows a DEMO mark in the demo state, shows tokens (four decimals, rounded down) with their euro value, writes euro Dutch style, follows the casino theme and runs under a CSP. `build-cost.jsonl` is the build ledger.
 - **RTP re-measured.** 40 million CSPRNG rounds showed the game paying about 95.1%, under the declared 96%: free spins delivered about a point under budget. The Wanted Payday table moved from an 8.4× to a 9.48× mean (6× to 28×), which measured 96.06% (±0.22) over 40 million rounds.
+- **Gaming Commission case GGC-2026-001 (rules 0.34.0).** The Wanted Payday is paid on the smallest bet that filled the meter, and a player's spins run one at a time across their tabs, so one full meter pays one Payday at the bet that earned it. The heartbeat counts only players with something in progress; seats get a one-minute grace period and no shared cookie; a decided win is journalled and its settle retried until the casino answers. The manifest publishes `rtp_sd`, `features` and `special_outcomes` (`payday`), and CI runs the odds check with a fixed seed.
 - **Grove game technology standard.** The repo is a pnpm workspace (`apps/web`, `apps/server`, `packages/shared`): Vue 3 + Pinia own the HUD, menus and bonus prompts; PixiJS owns the canvas; Fastify + Zod + SQLite (round references and Wanted levels only) on Node 24 own the game. CI is the standard `build.yml` (numbered GHCR images `1.0.<n>`). The tables and trees in §2 and §6 below are updated to match.
 
 ## 2. Tech stack
@@ -83,7 +84,7 @@ Lowrider now runs as a Grove Casino game under the casino's integration guide (`
 
 ### Bet settings
 - Bet per line: 1, 2, 5, 10, 25 tokens → total bet 20–500.
-- Auto-spin (10/25/50/100, stops on any bonus or a big win) and a Turbo toggle.
+- Auto-spin (10/25/50/100/unlimited, stops on any bonus or a big win unless "don't stop" is ticked, off by default) and a Turbo toggle.
 
 ### Target math (for fun, but keep it honest)
 - Target **RTP ≈ 96%**, medium volatility, hit rate ≈ 25–30%.
@@ -166,7 +167,7 @@ Lowrider now runs as a Grove Casino game under the casino's integration guide (`
 apps/
   server/src/
     main.ts               # env, casino (SDK or stub), journal, watch(), housekeeping, SIGTERM drain
-    app.ts                # Fastify: /health, JSON API, SSE events, cookies, rate limits, static page
+    app.ts                # Fastify: /health, JSON API, SSE events, per-tab seats, rate limits, static page
     game.ts               # LowriderGame: sessions, spin/gamble/collect as casino rounds, reconcile
     casino/               # the casino SDK (casino-game.js + .d.ts, verbatim) and small helpers around it
     fakeCasino.ts         # stub casino with the SDK's interface, for local play and tests
@@ -234,7 +235,7 @@ Prep before use:
 | 1 | **Scaffold** ✅ | Vite + TS + Pixi + Vitest, CI running tests, seeded RNG, layout system, leaderboard interface, placeholder grid |
 | 2 | **Engine core** ✅ | Reel strips, spin, line evaluation, paytable, bonus triggers; unit tests; wired into the placeholder screen |
 | 3 | **Simulator** ✅ | `npm run sim -- [rounds] [seed]` reports RTP, hit rate, biggest win and trigger rates; a 200k-round test guards the maths in CI |
-| 4 | **Base game UI** ✅ | Spinning reels with bounce, HUD (balance, bet −/+, win, auto-spin 10–100, turbo, space bar), win lines cycling with labels, saved wallet |
+| 4 | **Base game UI** ✅ | Spinning reels with bounce, HUD (balance, bet −/+, win, auto-spin 10–100 or unlimited, turbo, space bar), win lines cycling with labels, saved wallet |
 | 5 | **Free Spins** ✅ | Spray Can trigger (10/15/20 spins), night backdrop, expanding wilds, Tag the Hood wall raising the multiplier to ×5 with +2 spins per level, +10 retriggers, free-spin RTP ≈ 21% |
 | 6 | **Lowrider Hop** ✅ | Pick 1 of 3 lowriders (cosmetic), 5 hops drawn from a weighted ×2–×50 table when the bonus triggers; HOP only plays the next animation; ≈ 7% RTP |
 | 7 | **Hold & Spin + Jackpots** ✅ | Stacked Cash Bags with values, 6+ start Cash Run: 3 respins that reset on every new bag, collect screen, Homie/Soldier/OG bag jackpots, Kingpin (1,000× + pot) for all 15 cells, jackpot meter, saved pot; ≈ 7.7% RTP |

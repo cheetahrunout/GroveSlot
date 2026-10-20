@@ -82,6 +82,8 @@ export const api = {
   gamble: (pick: Alley) =>
     call<{ escape: Alley; won: boolean; stake: number; canContinue: boolean; state: PublicState }>('POST', '/api/gamble', { pick }),
   collect: () => call<{ state: PublicState }>('POST', '/api/collect', {}),
+  /** The bonus of the last spin has been played back: nothing from it is in progress any more. */
+  shown: () => call<{ ok: boolean }>('POST', '/api/shown', {}),
   leave: () => navigator.sendBeacon?.(`/api/leave${seatQuery()}`),
   /** Live control state (open, demo, maintenance, closed, offline) and the player's balance. */
   events: (onControl: (c: ControlEvent) => void, onBalance: (b: BalanceEvent) => void): EventSource => {

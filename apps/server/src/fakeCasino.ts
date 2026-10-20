@@ -32,7 +32,9 @@ export class FakeCasino implements Casino {
   readonly sessions = new Map<string, string>();
   readonly scores: { session: string; score: number }[] = [];
   readonly calls: string[] = [];
-  readonly heartbeats: { version?: string; players?: number }[] = [];
+  readonly heartbeats: { version?: string; players?: number; sessions?: string[] }[] = [];
+  /** Tests: the admin's seat cap per player (409 with `sessions` beyond it). */
+  seatLimit = Infinity;
   control_: Control = {
     status: 'open',
     demo: false,
@@ -126,6 +128,8 @@ export class FakeCasino implements Casino {
     if (!token) throw new CasinoError('bad token', 401, { error: 'bad token' });
     if (this.control_.status !== 'open' && this.control_.status !== 'demo') throw new CasinoError('not open', 409, { error: 'not open', game_status: this.control_.status });
     const key = `player-${token}`;
+    const held = [...this.sessions.values()].filter((owner) => owner === key).length;
+    if (held >= this.seatLimit) throw new CasinoError('too many sessions', 409, { error: 'too many sessions', sessions: held });
     if (!this.wallets.has(key)) this.wallets.set(key, this.startTokens * 1e6);
     const session = randomUUID();
     this.sessions.set(session, key);
@@ -203,9 +207,9 @@ export class FakeCasino implements Casino {
     throw new CasinoError('Lowrider is single-player', 400, { error: 'not multiplayer' });
   }
 
-  async heartbeat(a?: { version?: string; players?: number }) {
+  async heartbeat(a?: { version?: string; players?: number; sessions?: string[] }) {
     this.maybeFail('heartbeat');
-    this.heartbeats.push({ version: a?.version, players: a?.players });
+    this.heartbeats.push({ version: a?.version, players: a?.players, ...(a?.sessions ? { sessions: a.sessions } : {}) });
     return { ...this.control_, server_time: Date.now() };
   }
 
@@ -230,7 +234,8 @@ export class FakeCasino implements Casino {
     const w = { state, extra };
     this.watchers.add(w);
     apply(state, this.control_);
-    const extraValue = typeof extra === 'function' ? (extra as () => { version?: string; players?: number })() : (extra as { version?: string; players?: number } | undefined);
+    type Extra = { version?: string; players?: number; sessions?: string[] };
+    const extraValue = typeof extra === 'function' ? (extra as () => Extra)() : (extra as Extra | undefined);
     void this.heartbeat(extraValue).catch(() => undefined);
     const forward: Handler = (type, data) => {
       if (type !== 'control' && type !== 'hello') onEvent?.(type, data);

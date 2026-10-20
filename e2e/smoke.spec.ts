@@ -21,19 +21,25 @@ test('the page loads, spins once and settles', async ({ page }) => {
   // Whole tokens, Dutch thousands separator, no decimals (the euro value sits next to it).
   await expect(balance).toHaveText(/^\d{1,3}(\.\d{3})* tok$/, { timeout: 30_000 });
   await expect(hud.locator('.balance .worth')).toHaveText(/^worth €\s[\d.]+,\d{2}$/);
-  const before = await balance.textContent();
 
   const spin = page.getByRole('button', { name: 'Spin' });
   await expect(spin).toBeEnabled();
+  const answered = page.waitForResponse((res) => new URL(res.url()).pathname === '/api/spin');
   await spin.click();
-  // The server took the bet: the balance moves straight away.
-  await expect(balance).not.toHaveText(before ?? '', { timeout: 15_000 });
+  // The server opened, decided and settled the round with the casino.
+  const res = await answered;
+  expect(res.status()).toBe(200);
+  const settled = (await res.json()) as { state: { balance: { tokensMicro: number } } };
   // Answer any bonus prompts until the round has been shown in full.
   await expect(async () => {
     const choice = page.locator('.action-bar button').first();
     if (await choice.isVisible()) await choice.click();
     await expect(spin).toBeEnabled({ timeout: 1_000 });
   }).toPass({ timeout: 100_000 });
+  // Then the HUD shows the balance the casino confirmed for this round, whole tokens rounded down.
+  // (A € 0,20 bet is a fraction of a token, so a winning spin may leave the figure as it was.)
+  const whole = Math.floor(settled.state.balance.tokensMicro / 1_000_000).toLocaleString('nl-NL');
+  await expect(balance).toHaveText(`${whole} tok`);
 
   expect(errors).toEqual([]);
 });
