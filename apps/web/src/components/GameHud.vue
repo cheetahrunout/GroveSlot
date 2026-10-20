@@ -5,6 +5,8 @@ import { useGameStore } from '../stores/game';
 import { euro, tokens } from '../view/format';
 
 const AUTO_OPTIONS = [10, 25, 50, 100] as const;
+/** Auto-spin loss limits, in total bets. */
+const LOSS_LIMITS = [10, 25, 50, 100] as const;
 const store = useGameStore();
 const controller = inject(CONTROLLER)!;
 const autoMenu = ref(false);
@@ -58,8 +60,15 @@ function startAuto(n: number): void {
           {{ store.autoRemaining !== null ? `STOP ${store.autoRemaining}` : 'AUTO' }}
         </button>
         <div v-if="autoMenu" class="auto-menu" role="menu">
+          <label class="limit">
+            <span>STOP AFTER LOSING</span>
+            <select v-model="store.autoLossLimit" class="g-button is-plain" aria-label="Auto-spin loss limit">
+              <option v-for="n in LOSS_LIMITS" :key="n" :value="n">{{ euro(n * store.betCents) }}</option>
+              <option :value="null">NO LIMIT</option>
+            </select>
+          </label>
           <button v-for="n in AUTO_OPTIONS" :key="n" class="g-button is-plain" role="menuitem" :disabled="!store.canSpin" @click="startAuto(n)">
-            {{ n }}
+            {{ n }} SPINS
           </button>
         </div>
       </div>
@@ -142,6 +151,18 @@ function startAuto(n: number): void {
   display: grid;
   gap: 6px;
   pointer-events: auto;
+}
+
+.limit {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border-radius: var(--grove-radius-md);
+  background: rgb(0 0 0 / 0.75);
+  font-family: var(--grove-font-ui);
+  font-size: clamp(11px, 1.6cqmin, 16px);
+  color: var(--grove-color-muted);
+  white-space: nowrap;
 }
 
 .spin-area {

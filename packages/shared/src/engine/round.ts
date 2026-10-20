@@ -8,7 +8,7 @@ import { playFreeSpins, type FreeSpinsResult } from './features/freeSpins';
 import { drawCashBag, playHoldAndSpin, type CashBag, type HoldAndSpinResult } from './features/holdAndSpin';
 import { playLowriderHop, type LowriderHopResult } from './features/lowriderHop';
 import { playTurfWar, type TurfWarResult } from './features/turfWar';
-import { INITIAL_WANTED, isGuaranteed, nextWanted, type WantedState } from './features/wanted';
+import { INITIAL_WANTED, isGuaranteed, nextWanted, paydayBet, type WantedState } from './features/wanted';
 import type { Rng } from './rng';
 import { spinReels, type Grid } from './spin';
 
@@ -40,7 +40,7 @@ export interface RoundResult {
   grid: Grid;
   /** Wilds sprayed by a Drive-By, if one happened. */
   driveBy: Position[] | null;
-  /** Wanted Level payday prize (0 when this was not a payday round). */
+  /** Wanted Level payday prize (0 when this was not a payday round), paid on the bet that filled the meter. */
   payday: number;
   base: Evaluation;
   /** What each Cash Bag on the base grid holds. */
@@ -118,8 +118,9 @@ export function playRound(
     features.turfWar = playTurfWar(rng, totalBet, 'random');
   }
 
+  // Paid on the smallest bet that filled the meter (never this spin's bet when it is bigger).
   const payday = isGuaranteed(state.wanted)
-    ? WANTED.payday[rng.weighted(WANTED.payday.map((p) => p.weight))].multiplier * totalBet
+    ? WANTED.payday[rng.weighted(WANTED.payday.map((p) => p.weight))].multiplier * paydayBet(state.wanted, totalBet)
     : 0;
 
   const uncapped = base.totalWin + payday + Object.values(features).reduce((sum, f) => sum + f.totalWin, 0);
@@ -139,5 +140,5 @@ export function playRound(
     totalWin,
     capped: uncapped > cap,
   };
-  return { result, state: { wanted: nextWanted(state.wanted, totalWin > 0) } };
+  return { result, state: { wanted: nextWanted(state.wanted, totalWin > 0, totalBet) } };
 }

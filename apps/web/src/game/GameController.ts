@@ -95,7 +95,9 @@ export class GameController {
       store.playUrl = typeof body.playUrl === 'string' ? body.playUrl : '';
       if (body.state) this.applyState(body.state as PublicState);
       if (this.rejoin(e)) return;
-      this.showError(e);
+      // The admin's seat cap: say so and offer the way back to the lobby.
+      if (e instanceof ApiError && e.code === 'seat_limit') store.notice = { title: 'Too many tabs', body: e.message };
+      else this.showError(e);
     }
     store.connected = true;
 
@@ -118,6 +120,10 @@ export class GameController {
       store.balance = balance;
     });
     window.addEventListener('pagehide', () => api.leave());
+    // Auto-spin never runs in a tab the player is not looking at.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this.stopAuto();
+    });
   }
 
   private applyState(state: PublicState): void {
@@ -128,6 +134,7 @@ export class GameController {
     store.balance = state.balance;
     store.betOptions = state.betOptions;
     store.wantedStars = state.wantedStars;
+    store.wantedBet = state.wantedBet;
     store.gambleOffer = state.gamble;
     const options = state.betOptions;
     if (options.length > 0 && !options.includes(store.betCents)) {
@@ -189,6 +196,9 @@ export class GameController {
 
   private async autoLoop(): Promise<void> {
     const { store } = this;
+    // The player's loss limit, in euro cents, fixed at the bet the run starts with.
+    const limit = store.autoLossLimit === null ? Infinity : store.autoLossLimit * store.betCents;
+    let net = 0;
     while (store.autoRemaining !== null && store.autoRemaining > 0) {
       if (store.busy) {
         await wait(100);
@@ -197,6 +207,11 @@ export class GameController {
       store.autoRemaining--;
       const result = await this.spin();
       if (!result || result.totalWin >= result.totalBet * AUTO_STOP_WIN) break;
+      net += result.totalWin - result.totalBet;
+      if (-net >= limit) {
+        store.toast('AUTO STOPPED', `Loss limit of ${euro(limit)} reached`);
+        break;
+      }
       await wait(result.totalWin > 0 ? 700 : 250);
     }
     this.stopAuto();
@@ -347,6 +362,7 @@ export class GameController {
       }
       if (result.payday > 0) this.addWin(result.payday);
       await this.presentFeatures(result);
+      if (Object.keys(result.features).length > 0) void api.shown().catch(() => undefined);
       if (result.capped) await scene.banner.show('MAX WIN', `Capped at ${euro(result.totalWin)}`, 1500);
       store.win = result.totalWin > 0 ? result.totalWin : null;
       if (bigWinTier(result.totalWin, result.totalBet) >= 0) {

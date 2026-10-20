@@ -3,8 +3,10 @@ import { RTP_BUDGET } from '../src/config/features';
 import { FEATURES } from '../src/engine/round';
 import { simulate } from '../src/engine/stats';
 
-const rounds = Number(process.argv[2] ?? 10_000_000);
-const seed = Number(process.argv[3] ?? 1);
+// pnpm passes the `--` through; skip it.
+const args = process.argv.slice(2).filter((a, i) => i > 0 || a !== '--');
+const rounds = Number(args[0] ?? 10_000_000);
+const seed = Number(args[1] ?? 1);
 const started = Date.now();
 const r = simulate(rounds, seed);
 

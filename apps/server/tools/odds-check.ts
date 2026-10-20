@@ -1,4 +1,6 @@
-// pnpm odds -- [loop rounds] [paytable rounds]
+// pnpm odds -- [loop rounds] [paytable rounds] [seed]
+// Without a seed it draws from the CSPRNG, as the casino does. CI passes a seed so the run is the same every time
+// (a CSPRNG run lands outside its 95% band one time in twenty by chance alone).
 // The casino's odds check (game-integration.md section 12, step 1):
 //   1. expectedRtp (from the casino SDK) over Lowrider's outcome distribution, measured from
 //      millions of engine rounds with the CSPRNG, against rtp_bps in casino-game.json.
@@ -6,6 +8,7 @@
 //      for 100,000 rounds, against the same figure.
 import { readFileSync } from 'node:fs';
 import { PAYLINES } from '@lowrider/shared/config/paylines';
+import { createRng } from '@lowrider/shared/engine/rng';
 import { INITIAL_STATE, playRound } from '@lowrider/shared/engine/round';
 import { expectedRtp } from '../src/casino/casino-game';
 import { FakeCasino } from '../src/fakeCasino';
@@ -14,8 +17,12 @@ import { Journal } from '../src/journal';
 import { cryptoRng } from '../src/rng';
 
 const manifest = JSON.parse(readFileSync(new URL('../../../casino-game.json', import.meta.url), 'utf8'));
-const loopRounds = Number(process.argv[2] ?? 100_000);
-const tableRounds = Number(process.argv[3] ?? 5_000_000);
+// pnpm passes the `--` through; skip it.
+const args = process.argv.slice(2).filter((a, i) => i > 0 || a !== '--');
+const loopRounds = Number(args[0] ?? 100_000);
+const tableRounds = Number(args[1] ?? 5_000_000);
+const seed = args[2] === undefined ? null : Number(args[2]);
+const rng = seed === null ? cryptoRng : createRng(seed);
 const bet = manifest.min_bet_cents as number;
 const declared = manifest.rtp_bps / 10_000;
 const pct = (x: number) => `${(x * 100).toFixed(2)}%`;
@@ -26,7 +33,7 @@ let started = Date.now();
 const payouts = new Map<number, number>();
 let state = INITIAL_STATE;
 for (let i = 0; i < tableRounds; i++) {
-  const played = playRound(cryptoRng, state, 1, { maxWin: (manifest.max_win_cents / bet) * PAYLINES.length });
+  const played = playRound(rng, state, 1, { maxWin: (manifest.max_win_cents / bet) * PAYLINES.length });
   state = played.state;
   const payout = played.result.totalWin / played.result.totalBet;
   payouts.set(payout, (payouts.get(payout) ?? 0) + 1);
@@ -36,7 +43,7 @@ const expected = expectedRtp(outcomes);
 const meanSq = outcomes.reduce((s, o) => s + o.p * o.payout ** 2, 0);
 const sigma = Math.sqrt(meanSq - expected ** 2);
 const tableBand = (2 * sigma) / Math.sqrt(tableRounds);
-console.log(`Lowrider odds check (CSPRNG)`);
+console.log(`Lowrider odds check (${seed === null ? 'CSPRNG' : `seed ${seed}`})`);
 console.log(`  Declared RTP     ${pct(declared)}  (casino-game.json rtp_bps ${manifest.rtp_bps})`);
 console.log(`  expectedRtp      ${pct(expected)}  over ${outcomes.length.toLocaleString('en-US')} distinct payouts from ${tableRounds.toLocaleString('en-US')} engine rounds (±${(tableBand * 100).toFixed(2)}, 95%)`);
 console.log(`                   ${points(expected - declared)} from declared  (${((Date.now() - started) / 1000).toFixed(1)} s)`);
@@ -46,7 +53,7 @@ started = Date.now();
 const casino = new FakeCasino(Number.MAX_SAFE_INTEGER / 4e6);
 casino.setState({ limitsCents: { min: bet, max: manifest.max_bet_cents, maxWin: manifest.max_win_cents }, settings: { gamble_enabled: false } });
 // The gamble is left out: it is a separate, exactly even bet.
-const { game, stop } = startGame(casino, { rng: cryptoRng, journal: new Journal(':memory:'), version: 'odds' });
+const { game, stop } = startGame(casino, { rng, journal: new Journal(':memory:'), version: 'odds' });
 await new Promise((r) => setTimeout(r, 0));
 const session = await game.openSession('odds');
 for (let i = 0; i < loopRounds; i++) await game.spin(session, bet);

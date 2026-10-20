@@ -47,6 +47,8 @@ jobs:
         run: pnpm run lint
       - name: Unit and integration tests
         run: pnpm run test
+      - name: Odds check (paytable and game loop against rtp_bps, fixed seed)
+        run: pnpm run odds -- 100000 3000000 2026
       - name: Production build
         run: pnpm run build
       - name: Browser smoke tests

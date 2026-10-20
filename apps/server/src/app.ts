@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import fastifyCookie from '@fastify/cookie';
 import fastifyRateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
@@ -31,17 +30,12 @@ export interface AppOptions {
   slug: string;
   /** The production Vite build to serve; skipped when missing. */
   webDir?: string;
-  /** Mark cookies Secure (always outside local play). */
-  secureCookies: boolean;
 }
 
-const COOKIE = 'lowrider_id';
-const COOKIE_MAX_AGE = 12 * 60 * 60;
-
 /**
- * The seat a request speaks for: the tab's `X-Lowrider-Seat` header, `?seat=` on the event stream and the
- * leave beacon (neither can carry a header), else the cookie for a page without storage. A player may hold
- * several seats at once (one per tab); tabs share cookies, so the cookie can never be the only key.
+ * The seat a request speaks for: the tab's `X-Lowrider-Seat` header, or `?seat=` on the event stream and the
+ * leave beacon (neither can carry a header). A player may hold several seats at once (one per tab), and tabs
+ * share cookies, so the seat is never kept in a cookie (rule 9): a page without storage keeps it in memory.
  */
 function seatOf(req: FastifyRequest): string | undefined {
   const header = req.headers['x-lowrider-seat'];
@@ -50,7 +44,7 @@ function seatOf(req: FastifyRequest): string | undefined {
   const query = req.query as Record<string, unknown> | undefined;
   const fromQuery = query?.seat;
   if (typeof fromQuery === 'string' && fromQuery) return fromQuery;
-  return req.cookies?.[COOKIE];
+  return undefined;
 }
 
 /** The Lowrider HTTP surface: the page, /health and the page's JSON API. */
@@ -64,7 +58,6 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     trustProxy: true,
   });
 
-  await app.register(fastifyCookie);
   await app.register(fastifyRateLimit, {
     max: 300,
     timeWindow: '1 minute',
@@ -93,9 +86,6 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const playUrl = casinoUrl ? `${casinoUrl}/play/${opts.slug}` : '';
   const welcome = (s: PlayerSession | null): Welcome => ({ casinoUrl, playUrl, slug: opts.slug, dev: devMode, state: game.publicState(s), seat: s ? s.id : null });
 
-  const setSessionCookie = (reply: FastifyReply, id: string) =>
-    reply.setCookie(COOKIE, id, { path: '/', httpOnly: true, sameSite: 'lax', secure: opts.secureCookies, maxAge: COOKIE_MAX_AGE });
-
   // The page may load only itself, plus the casino's theme and bar (and the fonts a theme imports).
   const casinoOrigin = casinoUrl ? new URL(casinoUrl).origin : '';
   const csp = [
@@ -120,7 +110,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
 
   app.setErrorHandler((error, _req, reply) => {
     if (error instanceof GameError) {
-      reply.code(error.status).send({ error: error.message, code: error.code, balance: error.balance, ...(error.status === 401 ? { playUrl } : {}) });
+      reply.code(error.status).send({ error: error.message, code: error.code, balance: error.balance, casinoUrl, ...(error.status === 401 ? { playUrl } : {}) });
       return;
     }
     const status = (error as { statusCode?: number }).statusCode;
@@ -153,8 +143,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
       reply.code(existing ? 200 : 401);
       return welcome(existing);
     }
-    const s = await game.openSession(useToken);
-    setSessionCookie(reply, s.id);
+    // A tab that already held a seat and comes back with a new token gives the old one up.
+    const s = await game.openSession(useToken, seatOf(req));
     return welcome(s);
   });
 
@@ -176,10 +166,15 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
 
   app.post('/api/collect', async (req) => ({ state: game.collect(requireSession(req)) }));
 
-  app.post('/api/leave', async (req, reply) => {
-    const id = seatOf(req);
-    if (id) await game.closeSession(id);
-    reply.clearCookie(COOKIE, { path: '/' });
+  /** The page finished playing back a bonus: nothing from that spin is in progress any more (rule 17). */
+  app.post('/api/shown', async (req) => {
+    game.featureShown(requireSession(req));
+    return { ok: true };
+  });
+
+  /** The page went away: the seat is kept for the grace period (a reload picks it back up), then closed. */
+  app.post('/api/leave', async (req) => {
+    game.pageLeft(seatOf(req));
     return { ok: true };
   });
 
@@ -197,10 +192,13 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
       if (id === sessionId) send('balance', { balance } satisfies BalanceEvent);
     });
     const ping = setInterval(() => res.write(': ping\n\n'), 25_000);
+    // While the stream is open the page is there; once it closes, the seat's grace period starts.
+    const streamClosed = game.streamOpened(sessionId);
     req.raw.on('close', () => {
       clearInterval(ping);
       stopControl();
       stopBalance();
+      streamClosed();
     });
   });
 

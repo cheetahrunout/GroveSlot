@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, inject, onMounted, ref } from 'vue';
-import { JACKPOTS, WANTED } from '@lowrider/shared/config/features';
+import { CASH_RUN, DRIVE_BY, FREE_SPINS, GAMBLE, JACKPOTS, LOWRIDER_HOP, TURF_WAR, WANTED } from '@lowrider/shared/config/features';
 import { PAYLINES } from '@lowrider/shared/config/paylines';
-import { CASH_TRIGGER_COUNT, LINE_PAYS, SCATTER_PAYS } from '@lowrider/shared/config/paytable';
+import { CASH_TRIGGER_COUNT, LINE_PAYS, MAX_WIN_MULTIPLIER, SCATTER_PAYS } from '@lowrider/shared/config/paytable';
+import manifest from '../../../../casino-game.json';
 import type { SymbolId } from '@lowrider/shared/config/symbols';
 import { ACHIEVEMENTS, SKINS, type SkinId } from '../economy/achievements';
 import type { Settings } from '../economy/progress';
@@ -41,6 +42,33 @@ const pays = computed(() =>
 
 const scatterPays = computed(() => [3, 4, 5].map((n) => euro(SCATTER_PAYS[n] * store.betCents)).join(' / '));
 const jackpotList = (['homie', 'soldier', 'og', 'kingpin'] as const).map((j) => `${JACKPOTS[j].name} ${JACKPOTS[j].multiplier}x`).join(', ');
+
+/** The declared return to player, from the manifest the casino registered (rtp_bps). */
+const rtp = `${(manifest.rtp_bps / 100).toLocaleString('nl-NL', { maximumFractionDigits: 2 })}%`;
+const maxWin = fmt(MAX_WIN_MULTIPLIER);
+
+/** A prize table as "multiple × bet: chance" rows, from the weights the server draws with. */
+function chances<T extends { weight: number }>(rows: readonly T[], label: (row: T) => string): { label: string; chance: string }[] {
+  const total = rows.reduce((sum, r) => sum + r.weight, 0);
+  return rows.map((r) => ({ label: label(r), chance: `${((r.weight / total) * 100).toLocaleString('nl-NL', { maximumFractionDigits: 1 })}%` }));
+}
+const x = (m: number) => `${fmt(m)}x bet`;
+const hopTable = chances(LOWRIDER_HOP.table, (r) => x(r.multiplier));
+const bagTable = chances(CASH_RUN.values, (r) => ('jackpot' in r ? `${JACKPOTS[r.jackpot].name} ${x(JACKPOTS[r.jackpot].multiplier)}` : x(r.multiplier)));
+const paydayTable = chances(WANTED.payday, (r) => x(r.multiplier));
+const wheelCounts = (() => {
+  const prizes = new Map<number, number>();
+  let backup = 0;
+  let ballas = 0;
+  for (const slice of TURF_WAR.wheel) {
+    if (slice.type === 'prize') prizes.set(slice.multiplier, (prizes.get(slice.multiplier) ?? 0) + 1);
+    else if (slice.type === 'backup') backup++;
+    else ballas++;
+  }
+  const list = [...prizes].sort((a, b) => a[0] - b[0]).map(([m, n]) => `${n} pay ${x(m)}`);
+  return `${TURF_WAR.wheel.length} slices: ${list.join(', ')}, ${backup} BACKUP, ${ballas} BALLAS`;
+})();
+const levels = FREE_SPINS.maxMultiplier - 1;
 
 const stats = computed(() => {
   void version.value;
@@ -128,10 +156,80 @@ onMounted(() => panel.value?.focus());
             </li>
             <li>The Trident G stands in for every symbol except Spray Can, Lowrider, Palm G and Cash Bag.</li>
             <li>
-              {{ WANTED.maxStars }} Wanted stars: the next spin also pays a Payday of {{ WANTED.payday[0].multiplier }}x to
-              {{ WANTED.payday[WANTED.payday.length - 1].multiplier }}x your bet. Return to player: 96%.
+              One spin pays at most {{ maxWin }}x your total bet, or the casino's maximum win if that is lower. Every
+              outcome, bonus games included, is decided by the game server the moment you spin. Return to player: {{ rtp }}.
             </li>
           </ul>
+
+          <h3>FREE SPINS</h3>
+          <ul class="rules">
+            <li>
+              3 / 4 / 5 Spray Cans give {{ FREE_SPINS.awards[3] }} / {{ FREE_SPINS.awards[4] }} / {{ FREE_SPINS.awards[5] }} free spins at
+              the bet that started them, on their own reels. A Trident G wild expands to fill its reel.
+            </li>
+            <li>
+              Every Spray Can tags the hood: each {{ FREE_SPINS.tagsPerLevel }} tags add +1 to the win multiplier (up to
+              {{ FREE_SPINS.maxMultiplier }}x, {{ levels }} levels) and {{ FREE_SPINS.spinsPerLevel }} more spins.
+            </li>
+            <li>3 Spray Cans on one free spin add {{ FREE_SPINS.retrigger }} spins. A run stops at {{ FREE_SPINS.maxSpins }} spins.</li>
+          </ul>
+
+          <h3>LOWRIDER HOP</h3>
+          <p class="note">
+            {{ LOWRIDER_HOP.hops }} hops, each paying from this table. The whole bonus is decided the moment it starts: the car you pick
+            and pressing HOP only play the result back.
+          </p>
+          <dl class="table">
+            <template v-for="r in hopTable" :key="r.label">
+              <dt>{{ r.label }}</dt>
+              <dd>{{ r.chance }}</dd>
+            </template>
+          </dl>
+
+          <h3>CASH RUN</h3>
+          <p class="note">
+            {{ CASH_TRIGGER_COUNT }}+ Cash Bags lock in place and you get {{ CASH_RUN.respins }} respins. Each empty cell lands a new bag with a
+            {{ (CASH_RUN.landChance * 100).toLocaleString('nl-NL') }}% chance per respin, and every new bag resets the respins to
+            {{ CASH_RUN.respins }}. Filling all 15 cells adds the KINGPIN, {{ x(JACKPOTS.kingpin.multiplier) }}. What a bag holds:
+          </p>
+          <dl class="table">
+            <template v-for="r in bagTable" :key="r.label">
+              <dt>{{ r.label }}</dt>
+              <dd>{{ r.chance }}</dd>
+            </template>
+          </dl>
+
+          <h3>TURF WAR</h3>
+          <p class="note">
+            Also starts by surprise on 1 in {{ fmt(Math.round(1 / TURF_WAR.randomChance)) }} spins that win nothing. The wheel has
+            {{ wheelCounts }}. It spins until the Ballas win: a prize takes the next of {{ TURF_WAR.territories.length }} territories, a
+            Backup blocks one Ballas push, and taking all {{ TURF_WAR.territories.length }} adds the TURF BOSS,
+            {{ x(TURF_WAR.turfBossMultiplier) }}.
+          </p>
+
+          <h3>WANTED LEVEL</h3>
+          <p class="note">
+            Every winning spin adds a star (up to {{ WANTED.maxStars }}); every {{ WANTED.lossesPerStar }} losing spins in a row take one
+            away. With {{ WANTED.maxStars }} stars the next spin also pays a PAYDAY, then the meter empties. The Payday is paid on the
+            smallest total bet you played since the meter was last empty, or on the payday spin's bet if that is smaller. Your stars
+            are shared by all your Lowrider tabs.
+          </p>
+          <dl class="table">
+            <template v-for="r in paydayTable" :key="r.label">
+              <dt>{{ r.label }}</dt>
+              <dd>{{ r.chance }}</dd>
+            </template>
+          </dl>
+
+          <h3>DRIVE-BY</h3>
+          <p class="note">On 1 in {{ fmt(Math.round(1 / DRIVE_BY.chance)) }} spins a car sprays {{ DRIVE_BY.minWilds }} to {{ DRIVE_BY.maxWilds }} wilds onto the reels before the spin is paid.</p>
+
+          <h3>CAR CHASE</h3>
+          <p class="note">
+            After a win of up to the table's maximum bet you may stake it on an alley, left or right. The getaway is drawn after you
+            pick, exactly 50/50: guess right and the stake doubles, guess wrong and it is lost. At most {{ GAMBLE.maxRounds }} picks, and
+            never more than {{ GAMBLE.capMultiplier }}x the original win. Collect at any time. Each pick is its own round at the casino.
+          </p>
         </template>
 
         <dl v-else-if="tab === 'stats'" class="stats">
@@ -263,6 +361,21 @@ dd {
 
 .stats {
   grid-template-columns: minmax(0, 1fr) auto;
+}
+
+h3 {
+  margin: 1.2em 0 0.3em;
+  font-family: var(--grove-font-tag);
+  font-weight: 400;
+  color: var(--grove-color-gold);
+}
+
+.table {
+  display: grid;
+  grid-template-columns: max-content max-content;
+  column-gap: 32px;
+  row-gap: 4px;
+  margin: 0 0 0 1.2em;
 }
 
 .rules {

@@ -54,6 +54,10 @@ async function boot(): Promise<void> {
     if (document.visibilityState === 'visible') progress.addPlayTime(30_000);
   }, 30_000);
 
+  // The casino bar's Feedback screenshot (integration 0.29.0): the game as the player sees it, instantly and on phones too.
+  const bar = (window as unknown as { GroveBar?: { screenshot?: () => unknown } }).GroveBar;
+  if (bar) bar.screenshot = () => app.renderer.extract.canvas({ target: app.stage, frame: app.screen, clearColor: TOKENS.color.background });
+
   if (import.meta.env.DEV) {
     // Local play: __groveslot.controller.forceNext = 'freeSpins' (the server ignores it with the real casino).
     (window as unknown as Record<string, unknown>).__groveslot = { controller, store, app };

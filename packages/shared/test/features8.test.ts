@@ -6,6 +6,7 @@ import { playTurfWar } from '../src/engine/features/turfWar';
 import { INITIAL_WANTED, isGuaranteed, nextWanted } from '../src/engine/features/wanted';
 import { createRng } from '../src/engine/rng';
 import { INITIAL_STATE, playRound } from '../src/engine/round';
+import { simulate } from '../src/engine/stats';
 
 describe('playTurfWar', () => {
   it('takes territories in order, uses backups, and stops at the Ballas or Turf Boss', () => {
@@ -71,20 +72,32 @@ describe('applyDriveBy', () => {
 describe('Wanted Level', () => {
   it('adds a star per win, drops one after a losing streak, and resets after the payday', () => {
     let w = INITIAL_WANTED;
-    for (let i = 0; i < WANTED.maxStars; i++) w = nextWanted(w, true);
+    for (let i = 0; i < WANTED.maxStars; i++) w = nextWanted(w, true, 20);
     expect(w.stars).toBe(WANTED.maxStars);
     expect(isGuaranteed(w)).toBe(true);
-    expect(nextWanted(w, true)).toEqual(INITIAL_WANTED);
+    expect(nextWanted(w, true, 20)).toEqual(INITIAL_WANTED);
 
-    let v = { stars: 3, lossStreak: 0 };
-    for (let i = 0; i < WANTED.lossesPerStar; i++) v = nextWanted(v, false);
-    expect(v).toEqual({ stars: 2, lossStreak: 0 });
-    expect(nextWanted({ stars: 0, lossStreak: WANTED.lossesPerStar - 1 }, false).stars).toBe(0);
+    let v = { stars: 3, lossStreak: 0, bet: 20 };
+    for (let i = 0; i < WANTED.lossesPerStar; i++) v = nextWanted(v, false, 20);
+    expect(v).toEqual({ stars: 2, lossStreak: 0, bet: 20 });
+    expect(nextWanted({ stars: 0, lossStreak: WANTED.lossesPerStar - 1, bet: 0 }, false, 20).stars).toBe(0);
+  });
+
+  it('remembers the smallest bet played since the meter was last empty', () => {
+    let w = nextWanted(INITIAL_WANTED, true, 100);
+    expect(w.bet).toBe(100);
+    w = nextWanted(w, true, 20);
+    w = nextWanted(w, true, 500);
+    expect(w).toMatchObject({ stars: 3, bet: 20 });
+    // An empty meter forgets the bet.
+    const empty = nextWanted({ stars: 1, lossStreak: WANTED.lossesPerStar - 1, bet: 20 }, false, 500);
+    expect(empty).toEqual({ stars: 0, lossStreak: 0, bet: 0 });
+    expect(nextWanted(empty, true, 500).bet).toBe(500);
   });
 
   it('pays a Payday prize from the table at five stars, without re-spinning', () => {
     const rng = createRng(3);
-    const state = { ...INITIAL_STATE, wanted: { stars: WANTED.maxStars, lossStreak: 0 } };
+    const state = { ...INITIAL_STATE, wanted: { stars: WANTED.maxStars, lossStreak: 0, bet: 40 } };
     const allowed = new Set<number>(WANTED.payday.map((p) => p.multiplier));
     for (let i = 0; i < 200; i++) {
       const { result, state: next } = playRound(rng, state, 2);
@@ -94,9 +107,44 @@ describe('Wanted Level', () => {
     }
   });
 
+  it('pays the Payday on the bet that filled the meter, never on a bigger payday spin (F1)', () => {
+    const rng = createRng(8);
+    // Filled at € 0,20 (line bet 1), the payday spin played at € 5,00 (line bet 25).
+    const state = { ...INITIAL_STATE, wanted: { stars: WANTED.maxStars, lossStreak: 0, bet: 20 } };
+    const allowed = new Set<number>(WANTED.payday.map((p) => p.multiplier * 20));
+    for (let i = 0; i < 200; i++) expect(allowed.has(playRound(rng, state, 25).result.payday)).toBe(true);
+    // A smaller payday spin pays on its own, smaller bet.
+    const small = playRound(rng, { ...INITIAL_STATE, wanted: { stars: WANTED.maxStars, lossStreak: 0, bet: 500 } }, 1);
+    expect(WANTED.payday.map((p) => p.multiplier * 20)).toContain(small.result.payday);
+  });
+
+  it('returns no more to a player who fills the meter small and raises the bet for the payday spin (F1)', () => {
+    const honest = simulate(200_000, 2024);
+    // Play at € 0,20 and raise to € 5,00 for every payday spin: 201% before the fix.
+    const rng = createRng(2024);
+    let state = INITIAL_STATE;
+    let bet = 0;
+    let won = 0;
+    let paydays = 0;
+    for (let i = 0; i < 200_000; i++) {
+      const lineBet = isGuaranteed(state.wanted) ? 25 : 1;
+      const out = playRound(rng, state, lineBet);
+      state = out.state;
+      bet += out.result.totalBet;
+      won += out.result.totalWin;
+      if (out.result.payday > 0) {
+        paydays++;
+        expect(out.result.payday).toBeLessThanOrEqual(WANTED.payday[WANTED.payday.length - 1].multiplier * 20);
+      }
+    }
+    expect(paydays).toBeGreaterThan(500);
+    expect(won / bet).toBeLessThan(honest.rtp + 0.03);
+    expect(won / bet).toBeLessThan(1);
+  });
+
   it('pays no Payday below five stars', () => {
     const rng = createRng(4);
-    const state = { ...INITIAL_STATE, wanted: { stars: WANTED.maxStars - 1, lossStreak: 0 } };
+    const state = { ...INITIAL_STATE, wanted: { stars: WANTED.maxStars - 1, lossStreak: 0, bet: 20 } };
     for (let i = 0; i < 200; i++) expect(playRound(rng, state, 1).result.payday).toBe(0);
   });
 });

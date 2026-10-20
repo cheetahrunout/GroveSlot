@@ -3,7 +3,7 @@ import { GAMBLE } from '@lowrider/shared/config/features';
 import { PAYLINES } from '@lowrider/shared/config/paylines';
 import { canGamble, playGamble, type Alley } from '@lowrider/shared/engine/features/gamble';
 import type { Rng } from '@lowrider/shared/engine/rng';
-import { playRound, type FeatureKey, type RoundResult } from '@lowrider/shared/engine/round';
+import { FEATURES, playRound, type FeatureKey, type RoundResult } from '@lowrider/shared/engine/round';
 import { isPlayable, type Balance, type GameStatus, type Limits, type PublicState } from '@lowrider/shared/api';
 import { CasinoError, errorData, retryable, rng as casinoRng, toBalance, toLimits, type Casino, type Player, type WatchState } from './casino';
 import type { Journal } from './journal';
@@ -19,8 +19,15 @@ export function betOptions(limits: Limits): number[] {
 const SCORE_MIN_MULTIPLIER = 10;
 /** The casino closes idle sessions after 12 hours; so do we. */
 const SESSION_IDLE_MS = 12 * 60 * 60 * 1000;
-/** Players seen within this window count towards the heartbeat. */
-const ACTIVE_MS = 5 * 60 * 1000;
+/**
+ * Rule 9: a seat whose page went away (no event stream, no call) is kept this
+ * long, so a reload picks it back up, then its casino session is closed.
+ */
+export const SEAT_GRACE_MS = 60 * 1000;
+/** A bonus the page is still playing back counts as in progress (rule 17) until it says so, or this long at most. */
+const FEATURE_SHOW_MAX_MS = 5 * 60 * 1000;
+/** Settle retries back off up to this; they go on until the casino answers (rule 11). */
+const SETTLE_BACKOFF_MAX_MS = 5000;
 /** How often the status reason and the token rate are re-read from the casino. */
 const CONTROL_REFRESH_MS = 5 * 60 * 1000;
 
@@ -52,7 +59,7 @@ interface GambleOffer {
 }
 
 export interface PlayerSession {
-  /** Our own id, the browser's cookie. Never the casino session. */
+  /** Our own id: the tab's seat. Never the casino session. */
   id: string;
   casinoSession: string;
   player: { id: string; name: string };
@@ -61,6 +68,10 @@ export interface PlayerSession {
   busy: boolean;
   gamble: GambleOffer | null;
   balance: Balance | null;
+  /** Event streams the tab holds open; a seat with none and no calls is in its grace period. */
+  streams: number;
+  /** A bonus is being played back on the page until this time (0 when none). */
+  featureUntil: number;
 }
 
 type BalanceListener = (sessionId: string, balance: Balance) => void;
@@ -77,6 +88,12 @@ export class LowriderGame {
   private readonly sessions = new Map<string, PlayerSession>();
   private readonly listeners = new Set<(c: ControlView) => void>();
   private readonly balanceListeners = new Set<BalanceListener>();
+  /** One player's spins run one at a time across all their seats, so the Wanted meter is read and written once per spin. */
+  private readonly playerQueues = new Map<string, Promise<unknown>>();
+  /** Rounds this process is still opening, deciding or settling; reconcile() leaves them alone. */
+  private readonly inFlight = new Set<string>();
+  /** Delay before settle retry `attempt` (tests shorten it). */
+  backoffMs = (attempt: number): number => Math.min(SETTLE_BACKOFF_MAX_MS, 250 * 2 ** (attempt - 1));
   private view: ControlView;
   private reason = '';
   private rateMicro: number | null = null;
@@ -194,13 +211,19 @@ export class LowriderGame {
     return this.view.settings.gamble_enabled !== false;
   }
 
+  /**
+   * Rule 17: the players with something in progress right now (a round, a
+   * bonus on screen, a Car Chase offer), never the seats we hold.
+   */
   activePlayers(now = Date.now()): number {
-    let n = 0;
-    for (const s of this.sessions.values()) if (now - s.lastSeen < ACTIVE_MS) n++;
-    return n;
+    const playing = new Set<string>();
+    for (const s of this.sessions.values()) {
+      if (s.busy || s.gamble || s.featureUntil > now) playing.add(s.player.id);
+    }
+    return playing.size;
   }
 
-  /** Casino session ids currently held (for the heartbeat sessions list). */
+  /** Casino session ids currently held, seated or within the grace period (for the heartbeat sessions list). */
   openCasinoSessions(): string[] {
     return [...this.sessions.values()].map((s) => s.casinoSession);
   }
@@ -216,7 +239,11 @@ export class LowriderGame {
 
   // --- sessions ------------------------------------------------------------
 
-  async openSession(token: string): Promise<PlayerSession> {
+  /**
+   * Swaps a one-time token for a casino session and a new seat. When the tab
+   * already held a seat (`previousSeat`), that seat's casino session is closed (rule 9).
+   */
+  async openSession(token: string, previousSeat?: string): Promise<PlayerSession> {
     if (!isPlayable(this.view.status)) {
       throw new GameError(409, this.view.status, this.view.reason || 'Lowrider is closed right now.');
     }
@@ -228,7 +255,14 @@ export class LowriderGame {
         throw new GameError(401, 'session_closed', 'This link has expired. Back to the casino for a fresh one.');
       }
       if (e instanceof CasinoError && e.status === 409) {
-        throw new GameError(409, String(errorData(e).game_status ?? 'refused'), 'Lowrider is closed right now.');
+        const data = errorData(e);
+        if (data.sessions !== undefined && (data.game_status === undefined || isPlayable(String(data.game_status) as GameStatus))) {
+          // The admin's seat cap for this player (rule 9): say so and send them back to the lobby.
+          const held = Array.isArray(data.sessions) ? data.sessions.length : Number(data.sessions);
+          const count = Number.isFinite(held) && held > 0 ? `${held} Lowrider tabs` : 'as many Lowrider tabs as';
+          throw new GameError(409, 'seat_limit', `You already have ${count} open, the most Grove Casino allows. Close one of them, or go back to the lobby.`);
+        }
+        throw new GameError(409, String(data.game_status ?? 'refused'), 'Lowrider is closed right now.');
       }
       throw e;
     }
@@ -241,9 +275,14 @@ export class LowriderGame {
       busy: false,
       gamble: null,
       balance: toBalance(opened.player),
+      streams: 0,
+      featureUntil: 0,
     };
     this.sessions.set(s.id, s);
     this.log('session_open');
+    // A known tab came back with a new token: its old casino session goes.
+    const old = previousSeat ? this.sessions.get(previousSeat) : undefined;
+    if (old && old !== s && !old.busy) await this.closeSession(old.id);
     return s;
   }
 
@@ -267,6 +306,41 @@ export class LowriderGame {
     this.log('session_close');
   }
 
+  /** The tab's event stream opened or closed. */
+  streamOpened(id: string | undefined): () => void {
+    const s = id ? this.sessions.get(id) : undefined;
+    if (!s) return () => {};
+    s.streams++;
+    s.lastSeen = Date.now();
+    return () => {
+      s.streams = Math.max(0, s.streams - 1);
+      s.lastSeen = Date.now();
+    };
+  }
+
+  /** The page went away (its leave beacon): the seat stays for the grace period, so a reload keeps it. */
+  pageLeft(id: string | undefined, now = Date.now()): void {
+    const s = id ? this.sessions.get(id) : undefined;
+    if (!s) return;
+    s.lastSeen = now;
+    s.featureUntil = 0;
+  }
+
+  /**
+   * Rule 9: closes the seats whose page has been gone for the grace period
+   * (no event stream, no call), freeing them at the casino. Runs every few seconds.
+   */
+  async sweepSeats(now = Date.now()): Promise<number> {
+    const gone = [...this.sessions.values()].filter((s) => s.streams === 0 && !s.busy && now - s.lastSeen > SEAT_GRACE_MS);
+    for (const s of gone) await this.closeSession(s.id);
+    return gone.length;
+  }
+
+  /** The page finished playing back a bonus: the player has nothing left in progress from that spin. */
+  featureShown(s: PlayerSession): void {
+    s.featureUntil = 0;
+  }
+
   publicState(s: PlayerSession | null): PublicState {
     return {
       status: this.view.status,
@@ -278,14 +352,16 @@ export class LowriderGame {
       player: s ? { name: s.player.name } : null,
       balance: s?.balance ?? null,
       wantedStars: s ? this.journal.loadState(s.player.id).wanted.stars : 0,
+      wantedBet: s ? this.journal.loadState(s.player.id).wanted.bet : 0,
       gamble: s?.gamble ? { stake: s.gamble.stake } : null,
     };
   }
 
   // --- rounds --------------------------------------------------------------
 
-  private requireLive(): void {
-    if (this.stopping) throw new GameError(503, 'restarting', 'Lowrider is restarting. Try again in a moment.');
+  /** `admitted`: the round was let in before a shutdown began (drain() waits for it), so only the casino's state counts. */
+  private requireLive(admitted = false): void {
+    if (this.stopping && !admitted) throw new GameError(503, 'restarting', 'Lowrider is restarting. Try again in a moment.');
     const { status, reason } = this.view;
     if (isPlayable(status)) return;
     const message =
@@ -306,6 +382,23 @@ export class LowriderGame {
       } catch (e) {
         if (!retryable(e) || attempt >= tries) throw e;
         await new Promise((r) => setTimeout(r, 250 * 2 ** (attempt - 1)));
+      }
+    }
+  }
+
+  /**
+   * Rule 11: a settle is retried until the casino answers (it is idempotent),
+   * so a decided win is never cancelled by a short outage. Only a shutdown
+   * stops it; the journal then settles the round after the restart.
+   */
+  private async settleUntilAnswered<T>(task: () => Promise<T>): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await task();
+      } catch (e) {
+        if (!retryable(e) || this.stopping) throw e;
+        if (attempt === 4) this.log('settle_retrying', { error: (e as Error).message });
+        await new Promise((r) => setTimeout(r, this.backoffMs(attempt)));
       }
     }
   }
@@ -345,6 +438,22 @@ export class LowriderGame {
   ): Promise<{ value: T; balance: Balance | null }> {
     const round = casinoRng.id();
     const kind = String(meta.type);
+    this.inFlight.add(round);
+    try {
+      return await this.runPaidRound(round, kind, s, betCents, meta, decide);
+    } finally {
+      this.inFlight.delete(round);
+    }
+  }
+
+  private async runPaidRound<T>(
+    round: string,
+    kind: string,
+    s: PlayerSession,
+    betCents: number,
+    meta: Record<string, unknown>,
+    decide: () => { winCents: number; outcome: string; value: T },
+  ): Promise<{ value: T; balance: Balance | null }> {
     // Written before the casino is asked, so a crash at any point leaves a trace to clean up.
     this.journal.setRound(round, kind, 'opening');
     try {
@@ -369,9 +478,11 @@ export class LowriderGame {
       await this.voidAndRecord(round, kind, 'game_error');
       throw new GameError(500, 'round_voided', 'Something went wrong; the round was voided and your bet refunded.');
     }
+    // From here the round is settled with this win, also after a restart; never voided.
+    this.journal.setDecided(round, kind, decided.winCents, decided.outcome);
 
     try {
-      const settled = await this.retry(() =>
+      const settled = await this.settleUntilAnswered(() =>
         this.casino.settle({ round, winCents: decided.winCents, outcome: decided.outcome, meta }),
       );
       this.journal.setRound(round, kind, 'settled');
@@ -387,8 +498,12 @@ export class LowriderGame {
         throw new GameError(409, 'refunded', 'The casino gave your stake back while Lowrider was offline. This spin does not count.', s.balance);
       }
       this.log('settle_failed', { error: (e as Error).message });
-      // The win was never confirmed: refund the bet instead and say so.
-      const voided = await this.voidAndRecord(round, kind, 'settle_failed');
+      if (retryable(e)) {
+        // Shutting down mid-retry: the journal settles the decided win after the restart.
+        throw new GameError(502, 'round_pending', 'The casino has not confirmed this round yet. Your win is paid as soon as it answers.');
+      }
+      // The casino refused the win itself: refund the bet instead and say so.
+      const voided = await this.voidAndRecord(round, kind, 'settle_refused');
       throw new GameError(
         502,
         voided ? 'round_voided' : 'round_pending',
@@ -417,17 +532,54 @@ export class LowriderGame {
   }
 
   /**
-   * After a restart (and on every heartbeat): void the rounds this server
-   * opened but never finished. The player saw no result for them, so a
-   * refund is the only safe ending; the casino also voids them after 6 h.
+   * After a restart (and every 30 s): finish the rounds this server started
+   * but did not finish. A decided round is settled with its recorded win
+   * (rule 11: settles are retried until the casino answers). A round that
+   * was never decided showed the player nothing, so it is voided and the bet
+   * refunded; the casino also voids them after 6 h.
    */
   async reconcile(): Promise<number> {
     let cleaned = 0;
-    for (const { id, kind } of this.journal.unfinishedRounds()) {
-      if (await this.voidAndRecord(id, kind, 'restart')) cleaned++;
+    for (const r of this.journal.unfinishedRounds()) {
+      if (this.inFlight.has(r.id)) continue;
+      if (r.status === 'decided' && r.winCents !== null) {
+        if (await this.settleRecorded(r.id, r.kind, r.winCents, r.outcome ?? '')) cleaned++;
+      } else if (await this.voidAndRecord(r.id, r.kind, 'restart')) cleaned++;
     }
     if (cleaned > 0) this.log('reconciled', { rounds: cleaned });
     return cleaned;
+  }
+
+  /** Settles a decided round from the journal; false while the casino does not answer. */
+  private async settleRecorded(round: string, kind: string, winCents: number, outcome: string): Promise<boolean> {
+    try {
+      await this.retry(() => this.casino.settle({ round, winCents, outcome, meta: { type: kind, recovered: true } }));
+      this.journal.setRound(round, kind, 'settled');
+      this.log('round_recovered', { kind, win: winCents });
+      return true;
+    } catch (e) {
+      if (retryable(e)) return false;
+      if (e instanceof CasinoError && e.status === 409 && errorData(e).refunded) {
+        this.journal.setRound(round, kind, 'refunded');
+        return true;
+      }
+      // The casino will not take this win (the round is gone, or the win is refused): refund the bet if it can.
+      this.log('recover_refused', { kind, error: (e as Error).message });
+      return this.voidAndRecord(round, kind, 'settle_refused');
+    }
+  }
+
+  /** Runs one player's rounds one at a time, whichever of their seats they come from. */
+  private async forPlayer<T>(playerId: string, task: () => Promise<T>): Promise<T> {
+    const before = this.playerQueues.get(playerId) ?? Promise.resolve();
+    const run = before.then(task, task);
+    const tail = run.catch(() => undefined);
+    this.playerQueues.set(playerId, tail);
+    try {
+      return await run;
+    } finally {
+      if (this.playerQueues.get(playerId) === tail) this.playerQueues.delete(playerId);
+    }
   }
 
   async spin(s: PlayerSession, totalBetCents: number, force?: FeatureKey | 'driveBy'): Promise<{ result: RoundResult; state: PublicState }> {
@@ -438,21 +590,28 @@ export class LowriderGame {
     if (s.busy) throw new GameError(409, 'busy', 'A spin is already running.');
     s.busy = true;
     s.gamble = null;
+    s.featureUntil = 0;
     try {
       const lineBet = totalBetCents / PAYLINES.length;
-      const before = this.journal.loadState(s.player.id);
-      let after = before;
-      const { value: result } = await this.playPaidRound(s, totalBetCents, { type: 'spin' }, () => {
-        const played = playRound(this.rng, before, lineBet, {
-          maxWin: this.view.limits.maxWinCents,
-          force: this.devMode ? force : undefined,
+      // The Wanted meter is the player's, shared by all their seats: read and written inside one queue,
+      // so two tabs spinning at once can never both collect the same Payday.
+      const result = await this.forPlayer(s.player.id, async () => {
+        // The casino may have changed state while this spin waited for the player's other tabs.
+        this.requireLive(true);
+        const before = this.journal.loadState(s.player.id);
+        let after = before;
+        const played = await this.playPaidRound(s, totalBetCents, { type: 'spin' }, () => {
+          const round = playRound(this.rng, before, lineBet, {
+            maxWin: this.view.limits.maxWinCents,
+            force: this.devMode ? force : undefined,
+          });
+          after = round.state;
+          return { winCents: round.result.totalWin, outcome: outcomeOf(round.result), value: round.result };
         });
-        after = played.state;
-        const r = played.result;
-        const outcome = Object.keys(r.features).join('+') || (r.totalWin > 0 ? 'win' : 'loss');
-        return { winCents: r.totalWin, outcome, value: r };
+        this.journal.saveState(s.player.id, after);
+        return played.value;
       });
-      this.journal.saveState(s.player.id, after);
+      if (FEATURES.some((f) => result.features[f])) s.featureUntil = Date.now() + FEATURE_SHOW_MAX_MS;
 
       if (result.totalWin > 0 && this.gambleEnabled && this.stakeAllowed(result.totalWin)) {
         s.gamble = { original: result.totalWin, stake: result.totalWin, rounds: 0 };
@@ -501,6 +660,18 @@ export class LowriderGame {
     s.gamble = null;
     return this.publicState(s);
   }
+}
+
+/**
+ * What the casino's ledger records for a spin: the bonus features, the
+ * Drive-By and the Wanted Payday by name (`win+payday`, `freeSpins+driveBy`).
+ */
+export function outcomeOf(r: RoundResult): string {
+  const parts: string[] = FEATURES.filter((f) => r.features[f]);
+  if (parts.length === 0) parts.push(r.totalWin > 0 ? 'win' : 'loss');
+  if (r.driveBy) parts.push('driveBy');
+  if (r.payday > 0) parts.push('payday');
+  return parts.join('+');
 }
 
 /**

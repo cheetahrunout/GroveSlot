@@ -14,6 +14,8 @@ const env = process.env;
 const VERSION = env.GAME_VERSION || pkg.version;
 const PORT = Number(env.PORT ?? 8787);
 const RECONCILE_MS = 30_000;
+/** How often seats whose page went away are checked against the grace period (rule 9). */
+const SEAT_SWEEP_MS = 10_000;
 const here = dirname(fileURLToPath(import.meta.url));
 
 /** One JSON line per event on stdout; never a key, token or session id. */
@@ -42,11 +44,11 @@ const app = await buildApp({
   casinoUrl: env.CASINO_PUBLIC_URL ?? '',
   slug: manifest.slug,
   webDir: env.WEB_DIR ? resolve(env.WEB_DIR) : resolve(here, '../../web/dist'),
-  secureCookies: !devMode,
 });
 
 async function housekeeping(): Promise<void> {
-  // Rounds left open by a crash or a casino outage are voided as soon as the casino answers.
+  // Rounds left by a crash or a casino outage are finished as soon as the casino answers:
+  // a decided win is settled, a round never decided is voided.
   if (live.controlState.status !== 'offline') {
     await live.reconcile().catch((e) => log('reconcile_failed', { error: (e as Error).message }));
   }
@@ -56,6 +58,7 @@ async function housekeeping(): Promise<void> {
 await live.refreshControl(true);
 void housekeeping();
 setInterval(() => void housekeeping(), RECONCILE_MS).unref();
+setInterval(() => void live.sweepSeats().catch((e) => log('sweep_failed', { error: (e as Error).message })), SEAT_SWEEP_MS).unref();
 
 // SIGTERM: stop taking rounds, let settles and voids in flight finish, stop the watch loop, exit.
 let stopping = false;
