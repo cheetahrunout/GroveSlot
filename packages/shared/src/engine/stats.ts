@@ -1,6 +1,21 @@
 import { createRng, type Rng } from './rng';
 import { FEATURES, INITIAL_STATE, playRound, type FeatureKey } from './round';
 
+/** The lower edges of the top-prize bands, in total bets; the last band runs to the biggest win. */
+export const PRIZE_BANDS_X = [50, 100, 250, 500, 1_000] as const;
+
+/** Rounds that paid 50 times the bet or more, by band: what `top_prizes` in casino-game.json declares (rule 4). */
+export interface PrizeBand {
+  fromX: number;
+  /** The band's upper edge, or null for the last band. */
+  toX: number | null;
+  hits: number;
+  /** Rounds per hit, on average. */
+  every: number;
+  /** The average win in the band, in total bets. */
+  averageX: number;
+}
+
 /** Where the RTP comes from, as fractions of the total amount bet. */
 export interface RtpBreakdown {
   rounds: number;
@@ -19,6 +34,7 @@ export interface RtpBreakdown {
   averageAward: Record<FeatureKey, number>;
   driveByEvery: number;
   paydayEvery: number;
+  topPrizes: PrizeBand[];
 }
 
 const perFeature = (value: number) =>
@@ -39,6 +55,7 @@ export function simulate(rounds: number, seed: number | Rng, lineBet = 1): RtpBr
   let paydayWon = 0;
   const featureWin = perFeature(0);
   const featureCount = perFeature(0);
+  const bands = PRIZE_BANDS_X.map(() => ({ hits: 0, sumX: 0 }));
 
   for (let i = 0; i < rounds; i++) {
     const out = playRound(rng, state, lineBet);
@@ -48,8 +65,18 @@ export function simulate(rounds: number, seed: number | Rng, lineBet = 1): RtpBr
     won += r.totalWin;
     base += r.base.totalWin;
     if (r.totalWin > 0) hits++;
-    maxWin = Math.max(maxWin, r.totalWin / r.totalBet);
-    sumSq += (r.totalWin / r.totalBet) ** 2;
+    const x = r.totalWin / r.totalBet;
+    maxWin = Math.max(maxWin, x);
+    sumSq += x ** 2;
+    let band = -1;
+    PRIZE_BANDS_X.forEach((edge, b) => {
+      if (x >= edge) band = b;
+    });
+    const hit = bands[band];
+    if (hit) {
+      hit.hits++;
+      hit.sumX += x;
+    }
     if (r.driveBy) driveBys++;
     if (r.payday > 0) paydays++;
     paydayWon += r.payday;
@@ -80,5 +107,15 @@ export function simulate(rounds: number, seed: number | Rng, lineBet = 1): RtpBr
     ) as Record<FeatureKey, number>,
     driveByEvery: driveBys > 0 ? rounds / driveBys : Infinity,
     paydayEvery: paydays > 0 ? rounds / paydays : Infinity,
+    topPrizes: PRIZE_BANDS_X.map((fromX, b) => {
+      const hit = bands[b] ?? { hits: 0, sumX: 0 };
+      return {
+        fromX,
+        toX: PRIZE_BANDS_X[b + 1] ?? null,
+        hits: hit.hits,
+        every: hit.hits > 0 ? rounds / hit.hits : Infinity,
+        averageX: hit.hits > 0 ? hit.sumX / hit.hits : 0,
+      };
+    }),
   };
 }

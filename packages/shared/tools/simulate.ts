@@ -32,4 +32,9 @@ for (const n of [500, 100_000]) {
   console.log(`  RTP spread     ±${((2 * r.stdDev) / Math.sqrt(n) * 100).toFixed(1)} points over ${n.toLocaleString('en-US')} rounds (95% of the time)`);
 }
 console.log(`  Biggest win    ${r.maxWinMultiplier.toFixed(1)}× bet`);
+for (const t of r.topPrizes) {
+  if (t.hits === 0) continue;
+  const band = t.toX === null ? `${t.fromX}x or more` : `${t.fromX}x to ${t.toX}x`;
+  console.log(`  Top prize      ${band.padEnd(14)} avg ${t.averageX.toFixed(0)}× bet, 1 in ${Math.round(t.every).toLocaleString('en-US')} (${t.hits} hits)`);
+}
 console.log(`  (${((Date.now() - started) / 1000).toFixed(1)} s)`);

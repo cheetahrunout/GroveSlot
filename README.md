@@ -4,7 +4,7 @@
 
 It follows the casino's integration guide (`game-integration.md`, served at https://casino.grovestreet.zip/game-integration.md): the game runs on its own server, every bet and win goes through the casino, and the page in the browser only shows results.
 
-**Rules revision: 0.34.0** (2026-10-20). This is the revision of the integration guide the game was last checked against (rule 15). Before every release, compare it with `GET https://casino.grovestreet.zip/api/integration`, read section 14 for what changed since, and update this line.
+**Rules revision: 0.68.0** (2026-10-25). This is the revision of the integration guide the game was last checked against (rule 15). Before every release, compare it with `GET https://casino.grovestreet.zip/api/integration`, read section 14 for what changed since, and update this line.
 
 ## Features
 
@@ -68,6 +68,8 @@ pnpm odds          # the casino's odds check: pnpm odds -- [loop rounds] [paytab
 
 The odds check (integration guide, section 12) does two things. It runs `expectedRtp` from the SDK over Lowrider's outcome distribution (5 million engine rounds by default), and it plays 100,000 rounds through the real game loop and the stub casino. Both are compared with `rtp_bps`. Lowrider's volatility is about 7× the bet per round, so a 100,000-round run normally lands within ±4.5 points of 96% by chance alone, and the casino's 500-round flag band (10 points) is narrower than chance at this volatility (about ±64 points). Only tens of millions of rounds pin the figure to within a few tenths of a point. Without a seed it draws from the CSPRNG, as the casino does; CI runs it with a fixed seed on every push (`pnpm odds -- 100000 3000000 2026`), so it fails only when the maths changes. The test suite also plays the two ways of playing the Gaming Commission found (GGC-2026-001): filling the Wanted meter at the smallest bet and raising the bet for the payday spin, and playing the payday spin on several tabs at once. Neither returns more than honest play.
 
+What `casino-game.json` declares about the odds (rule 4) comes from `pnpm sim` (20 million rounds, seed 2026): `rtp_sd` 7,2 bets, the features with their trigger rates and shares, and `top_prizes`, every round of 50 bets or more in five bands, from 69 bets once in 684 rounds to 1.000 bets and more once in about 740.000. Run it again and update the manifest whenever the maths changes.
+
 - `apps/server/`: Fastify game server (the casino SDK, sessions, rounds, control state, SSE, SQLite journal, the stub casino for local play and tests)
 - `apps/web/`: the page: Vue 3 + Pinia for the HUD and menus, PixiJS for the canvas, Grove design tokens as CSS variables
 - `packages/shared/`: game maths (run only by the server), reel/paytable config and the Zod API contract
@@ -77,7 +79,7 @@ The odds check (integration guide, section 12) does two things. It runs `expecte
 
 ## Deploy
 
-- `Dockerfile` is multi-stage: it builds with pnpm on Node 24 and runs only the server bundle, its production dependencies and the built page, as the non-root `node` user. `BUILD_VERSION` becomes `GAME_VERSION`, which `/health` and the heartbeat report. Mount a volume on `/data` for the SQLite journal.
+- `Dockerfile` is multi-stage: it builds with pnpm on Node 24 and runs only the server bundle, its production dependencies and the built page, as the non-root `node` user. `BUILD_VERSION` becomes `GAME_VERSION`, which `/health` and the heartbeat report. The SQLite journal lives under `DATA_DIR` (`/app/data`, where the casino mounts the game's volume); `DATA_PATH` overrides the file.
 - Runtime environment (the Portainer stack only, never the repository or build arguments): `PORT` (8080 in the image), `CASINO_URL` (the casino API on the LAN), `CASINO_PUBLIC_URL` (the casino's public address) and `GAME_KEY`.
 - `.github/workflows/build.yml` is the guide's workflow: on every push to every branch it runs typecheck, lint, tests, build and the Playwright smoke tests, then publishes `ghcr.io/<owner>/<repo>:1.0.<build number>` (linux/amd64). Pushes to `main` also get a GitHub Release. The casino host pulls with the casino owner's GHCR credentials, so make the package public or give that account read access.
 - `build-cost.jsonl` must be up to date before every release. From the casino repository: `node tools/build-cost.js lowrider <transcripts dir> --ledger <this repo>/build-cost.jsonl`. The repository is private, so the casino needs read access to it (ask the admin).

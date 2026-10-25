@@ -31,7 +31,9 @@ if (!devMode && !env.GAME_KEY) {
   process.exit(1);
 }
 const casino: Casino = devMode ? new FakeCasino() : createCasino({ url: env.CASINO_URL, key: env.GAME_KEY });
-const journal = new Journal(env.DATA_PATH ?? (devMode ? ':memory:' : resolve(here, '../data/lowrider.db')));
+// The casino mounts the game's data volume at DATA_DIR (/app/data), the only place the container may write.
+const dataFile = env.DATA_DIR ? resolve(env.DATA_DIR, 'lowrider.db') : resolve(here, '../data/lowrider.db');
+const journal = new Journal(env.DATA_PATH ?? (devMode ? ':memory:' : dataFile));
 
 // Heartbeat at once and every 30 s (version and players), control stream, balance events.
 const { game: live, stop: stopWatch } = startGame(casino, { rng: cryptoRng, journal, log, devMode, version: VERSION });
