@@ -10,7 +10,7 @@ export type TableStatus = 'open' | 'full' | 'playing' | 'closed';
 export type Meta = Record<string, unknown>;
 
 /** the limits the admin set in euro, and the same in micro-tokens at the current rate (null before the first rate tick); a game that bets in tokens scales its credits to the micro figures */
-export interface Limits { min_bet_cents: number; max_bet_cents: number; max_win_cents: number; min_bet_micro: number | null; max_bet_micro: number | null; max_win_micro: number | null; }
+export interface Limits { min_bet_cents: number; max_bet_cents: number; max_win_cents: number; min_bet_micro: number | null; max_bet_micro: number | null; max_win_micro: number | null; /** how many seats one player may hold at this game at once, the admin's number; the casino enforces it at session/open, show it if you like, never cap on your own */ sessions_per_player: number; }
 
 /** what /api/game/control, every heartbeat answer and every 'control' event carry */
 export interface Control {
@@ -95,7 +95,7 @@ export interface TableReport {
   meta?: Meta;
 }
 
-export interface Heartbeat { version?: string; players?: number; sessions?: string[]; tables?: TableReport[]; }
+export interface Heartbeat { version?: string; players?: number; /** every casino session the game holds, seated or within its grace period; the list is complete: one left out for GAME_SESSION_GRACE_S (60 s) is closed by the casino */ sessions?: string[]; tables?: TableReport[]; }
 
 /** the object watch() keeps current; read status, settings and limits from it before every round */
 export interface WatchState {

@@ -20,15 +20,16 @@ WORKDIR /app
 ENV NODE_ENV=production \
     PORT=8080 \
     WEB_DIR=/app/web \
-    DATA_PATH=/data/lowrider.db
+    DATA_DIR=/app/data
 COPY --from=build /out/node_modules ./node_modules
 COPY --from=build /out/package.json ./package.json
 COPY --from=build /app/apps/server/dist ./dist
 COPY --from=build /app/apps/web/dist ./web
 COPY casino-game.json ./
 # SQLite keeps round references and Wanted levels only; never balances.
-RUN mkdir -p /data && chown node:node /data
-VOLUME /data
+# The casino mounts the data volume at DATA_DIR; a new volume takes this folder with its owner (casino 0.52.0).
+RUN mkdir -p /app/data && chown node:node /app/data
+VOLUME /app/data
 USER node
 # Set by CI to 1.0.<build number>; reported by /health and the heartbeat.
 ARG BUILD_VERSION=dev

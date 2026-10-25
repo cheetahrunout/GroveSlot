@@ -7,7 +7,7 @@
   "blurb": "Grove Street slot: free spins, Lowrider Hop, Cash Run, Turf War and the Car Chase.",
   "icon": "🚗",
   "rtp_bps": 9600,
-  "rtp_sd": 7.1,
+  "rtp_sd": 7.2,
   "features": [
     {
       "name": "Free Spins",
@@ -39,6 +39,13 @@
       "rtp_bps": 496,
       "max_x": 28
     }
+  ],
+  "top_prizes": [
+    { "name": "Win of 50x to 100x", "x": 69, "every": 684 },
+    { "name": "Win of 100x to 250x", "x": 140, "every": 1283 },
+    { "name": "Win of 250x to 500x", "x": 323, "every": 9337 },
+    { "name": "Win of 500x to 1000x", "x": 628, "every": 69444 },
+    { "name": "Win of 1000x or more", "x": 1376, "every": 740741 }
   ],
   "special_outcomes": [
     "payday"

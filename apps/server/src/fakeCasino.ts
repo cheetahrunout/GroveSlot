@@ -42,7 +42,7 @@ export class FakeCasino implements Casino {
     currency: 'euro',
     unit: null,
     settings: {},
-    limits: { min_bet_cents: 20, max_bet_cents: 500, max_win_cents: 2_500_000, min_bet_micro: centsToMicro(20), max_bet_micro: centsToMicro(500), max_win_micro: centsToMicro(2_500_000) },
+    limits: { min_bet_cents: 20, max_bet_cents: 500, max_win_cents: 2_500_000, min_bet_micro: centsToMicro(20), max_bet_micro: centsToMicro(500), max_win_micro: centsToMicro(2_500_000), sessions_per_player: 4 },
     rate_micro: RATE_MICRO,
     rtp_bps: 9600,
     multiplayer: false,
@@ -96,7 +96,7 @@ export class FakeCasino implements Casino {
     }
     if (patch.limitsCents) {
       const { min, max, maxWin } = patch.limitsCents;
-      c.limits = { min_bet_cents: min, max_bet_cents: max, max_win_cents: maxWin, min_bet_micro: centsToMicro(min), max_bet_micro: centsToMicro(max), max_win_micro: centsToMicro(maxWin) };
+      c.limits = { min_bet_cents: min, max_bet_cents: max, max_win_cents: maxWin, min_bet_micro: centsToMicro(min), max_bet_micro: centsToMicro(max), max_win_micro: centsToMicro(maxWin), sessions_per_player: c.limits.sessions_per_player };
     }
     if (patch.reason !== undefined) c.status_reason = patch.reason || null;
     if (patch.settings) c.settings = patch.settings;
